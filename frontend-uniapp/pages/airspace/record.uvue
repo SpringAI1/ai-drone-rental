@@ -1,0 +1,619 @@
+<template>
+  <view class="airspace-page">
+    <!-- 顶部栏 -->
+    <view class="airspace-header">
+      <text class="header-title">空域备案</text>
+      <text class="header-sub">按照民航局要求登记飞行空域</text>
+    </view>
+
+    <!-- 表单 -->
+    <view class="form-card">
+      <view class="form-item">
+        <text class="form-label">区域名称 <text class="required">*</text></text>
+        <input
+          class="form-input"
+          v-model="form.regionName"
+          placeholder="例如：朝阳区公园飞行区域"
+          maxlength="30"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">详细地址</text>
+        <view class="address-picker-row" @click="openAddressPicker">
+          <text class="picker-text" :class="{ placeholder: !form.regionAddress }">
+            {{ form.regionAddress || '点击选择常用地址' }}
+          </text>
+          <text class="picker-arrow">›</text>
+        </view>
+        <view class="quick-address-row">
+          <view
+            class="quick-address-chip"
+            v-for="(addr, idx) in quickAddressList"
+            :key="idx"
+            @click="form.regionAddress = addr"
+          >
+            <text class="chip-text">{{ addr }}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">最大飞行高度(米) <text class="required">*</text></text>
+        <input
+          class="form-input"
+          v-model.number="form.maxAltitude"
+          type="number"
+          placeholder="请输入数字，例如 120"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">飞行半径(米)</text>
+        <input
+          class="form-input"
+          v-model.number="form.radius"
+          type="number"
+          placeholder="请输入数字，例如 500"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">计划开始日期 <text class="required">*</text></text>
+        <picker mode="date" :value="startDate" @change="onStartDateChange">
+          <view class="picker-row">
+            <text class="picker-text" :class="{ placeholder: !form.plannedStartTime }">
+              {{ startDate || '请选择开始日期' }}
+            </text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">计划开始时间 <text class="required">*</text></text>
+        <picker mode="time" :value="startTime" @change="onStartTimeChange">
+          <view class="picker-row">
+            <text class="picker-text" :class="{ placeholder: !form.plannedStartTime }">
+              {{ startTime || '请选择开始时间' }}
+            </text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">计划结束日期 <text class="required">*</text></text>
+        <picker mode="date" :value="endDate" @change="onEndDateChange">
+          <view class="picker-row">
+            <text class="picker-text" :class="{ placeholder: !form.plannedEndTime }">
+              {{ endDate || '请选择结束日期' }}
+            </text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">计划结束时间 <text class="required">*</text></text>
+        <picker mode="time" :value="endTime" @change="onEndTimeChange">
+          <view class="picker-row">
+            <text class="picker-text" :class="{ placeholder: !form.plannedEndTime }">
+              {{ endTime || '请选择结束时间' }}
+            </text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">飞行用途</text>
+        <textarea
+          class="form-textarea"
+          v-model="form.purpose"
+          placeholder="请简要描述飞行用途，如航拍、测绘、农业植保等"
+          maxlength="200"
+        />
+      </view>
+    </view>
+
+    <view class="submit-box">
+      <view
+        class="submit-btn"
+        :class="{ disabled: submitting }"
+        @click="handleSubmit"
+      >
+        <text class="submit-text">{{ submitting ? '提交中...' : '提交备案' }}</text>
+      </view>
+    </view>
+
+    <!-- 我的备案列表 -->
+    <view class="record-card" v-if="records.length > 0">
+      <view class="record-title-row">
+        <text class="record-title">我的备案记录</text>
+        <text class="record-total">共 {{ records.length }} 条</text>
+      </view>
+      <view
+        class="record-item"
+        v-for="item in records"
+        :key="item.id"
+      >
+        <view class="record-header-row">
+          <text class="record-name">{{ item.regionName }}</text>
+          <view class="status-tag" :class="'status-' + item.auditStatus">
+            <text class="status-text">{{ getStatusText(item.auditStatus) }}</text>
+          </view>
+        </view>
+        <text class="record-info" v-if="item.regionAddress">地址：{{ item.regionAddress }}</text>
+        <text class="record-info">高度：{{ item.maxAltitude }}米 · 半径：{{ item.radius || 500 }}米</text>
+        <text class="record-info">时间：{{ formatTime(item.plannedStartTime) }} - {{ formatTime(item.plannedEndTime) }}</text>
+        <text class="record-info" v-if="item.purpose">用途：{{ item.purpose }}</text>
+        <text class="record-remark" v-if="item.auditRemark">审核备注：{{ item.auditRemark }}</text>
+        <text class="record-time">{{ formatTime(item.createdTime) }} 提交</text>
+      </view>
+    </view>
+
+    <view class="bottom-space"></view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref, onMounted } from 'vue'
+import { submitAirspace, getAirspaceList } from '../../api/airspace'
+
+interface AirspaceForm {
+  regionName: string
+  regionAddress: string
+  longitude: number | null
+  latitude: number | null
+  radius: number | null
+  maxAltitude: number | null
+  plannedStartTime: string
+  plannedEndTime: string
+  purpose: string
+}
+
+const form = ref<AirspaceForm>({
+  regionName: '',
+  regionAddress: '',
+  longitude: null,
+  latitude: null,
+  radius: null,
+  maxAltitude: 120,
+  plannedStartTime: '',
+  plannedEndTime: '',
+  purpose: ''
+})
+
+const quickAddressList = ref<string[]>([
+  '北京市朝阳区三里屯',
+  '北京市海淀区中关村',
+  '上海市浦东新区陆家嘴',
+  '广州市天河区珠江新城',
+  '深圳市南山区科技园',
+  '杭州市西湖区文三路',
+  '成都市高新区天府大道',
+  '南京市鼓楼区新街口'
+])
+
+const startDate = ref<string>('')
+const startTime = ref<string>('')
+const endDate = ref<string>('')
+const endTime = ref<string>('')
+const records = ref<any[]>([])
+const submitting = ref<boolean>(false)
+
+const pad = (n: number): string => {
+  if (n < 10) return '0' + n
+  return '' + n
+}
+
+const getStatusText = (status: number): string => {
+  if (status === 0) return '待审核'
+  if (status === 1) return '已通过'
+  if (status === 2) return '已拒绝'
+  return '未知'
+}
+
+const formatTime = (t: string): string => {
+  if (!t) return ''
+  return t.substring(0, 16).replace('T', ' ')
+}
+
+const onStartDateChange = (e: any) => {
+  startDate.value = e.detail.value
+  form.value.plannedStartTime = combineDateTime(startDate.value, startTime.value)
+}
+
+const onStartTimeChange = (e: any) => {
+  startTime.value = e.detail.value
+  form.value.plannedStartTime = combineDateTime(startDate.value, startTime.value)
+}
+
+const onEndDateChange = (e: any) => {
+  endDate.value = e.detail.value
+  form.value.plannedEndTime = combineDateTime(endDate.value, endTime.value)
+}
+
+const onEndTimeChange = (e: any) => {
+  endTime.value = e.detail.value
+  form.value.plannedEndTime = combineDateTime(endDate.value, endTime.value)
+}
+
+const combineDateTime = (date: string, time: string): string => {
+  if (!date || !time) return ''
+  return date + ' ' + time + ':00'
+}
+
+const openAddressPicker = () => {
+  uni.showActionSheet({
+    itemList: quickAddressList.value,
+    success: (res) => {
+      form.value.regionAddress = quickAddressList.value[res.tapIndex]
+    }
+  })
+}
+
+const loadRecords = async () => {
+  try {
+    const res = await getAirspaceList()
+    const list = (res.data as any[]) || []
+    records.value = list.map((r: any) => ({
+      id: r.id,
+      regionName: r.regionName || r.region_name || '未命名区域',
+      regionAddress: r.regionAddress || r.region_address || '',
+      longitude: r.longitude,
+      latitude: r.latitude,
+      radius: r.radius,
+      maxAltitude: r.maxAltitude != null ? r.maxAltitude : r.max_altitude,
+      plannedStartTime: r.plannedStartTime || r.planned_start_time || '',
+      plannedEndTime: r.plannedEndTime || r.planned_end_time || '',
+      purpose: r.purpose || '',
+      auditStatus: r.auditStatus != null ? Number(r.auditStatus) : Number(r.audit_status) || 0,
+      auditRemark: r.auditRemark || r.audit_remark || '',
+      createdTime: r.createdTime || r.created_time || ''
+    }))
+  } catch (err) {
+    console.error('加载备案失败', err)
+  }
+}
+
+const handleSubmit = async () => {
+  if (!form.value.regionName || form.value.regionName.trim().length < 2) {
+    uni.showToast({ title: '请填写区域名称', icon: 'none' })
+    return
+  }
+  if (!form.value.maxAltitude || Number(form.value.maxAltitude) <= 0) {
+    uni.showToast({ title: '请输入有效的最大飞行高度', icon: 'none' })
+    return
+  }
+  if (!form.value.plannedStartTime) {
+    uni.showToast({ title: '请选择开始日期和时间', icon: 'none' })
+    return
+  }
+  if (!form.value.plannedEndTime) {
+    uni.showToast({ title: '请选择结束日期和时间', icon: 'none' })
+    return
+  }
+
+  submitting.value = true
+  try {
+    const res = await submitAirspace({
+      regionName: form.value.regionName,
+      regionAddress: form.value.regionAddress,
+      longitude: form.value.longitude,
+      latitude: form.value.latitude,
+      radius: form.value.radius || 500,
+      maxAltitude: Number(form.value.maxAltitude),
+      plannedStartTime: form.value.plannedStartTime,
+      plannedEndTime: form.value.plannedEndTime,
+      purpose: form.value.purpose
+    })
+    uni.showToast({ title: '提交成功，等待审核', icon: 'success' })
+
+    form.value = {
+      regionName: '',
+      regionAddress: '',
+      longitude: null,
+      latitude: null,
+      radius: null,
+      maxAltitude: 120,
+      plannedStartTime: '',
+      plannedEndTime: '',
+      purpose: ''
+    }
+    startDate.value = ''
+    startTime.value = ''
+    endDate.value = ''
+    endTime.value = ''
+
+    setTimeout(() => {
+      loadRecords()
+    }, 800)
+  } catch (err) {
+    console.error('提交失败', err)
+  } finally {
+    submitting.value = false
+  }
+}
+
+onMounted(() => {
+  loadRecords()
+})
+</script>
+
+<style lang="scss">
+page {
+  min-height: 100vh;
+  background: #f4f7fb;
+}
+
+.airspace-page {
+  min-height: 100vh;
+  background: #f4f7fb;
+  padding-bottom: 40rpx;
+}
+
+.required {
+  color: #ef4444;
+  font-weight: 700;
+  margin-left: 4rpx;
+}
+
+/* 顶部 */
+.airspace-header {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  padding: 48rpx 32rpx 36rpx;
+  border-radius: 0 0 32rpx 32rpx;
+}
+
+.header-title {
+  display: block;
+  color: #ffffff;
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.header-sub {
+  display: block;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 24rpx;
+  margin-top: 8rpx;
+}
+
+/* 表单 */
+.form-card {
+  background: #ffffff;
+  margin: 20rpx;
+  border-radius: 20rpx;
+  padding: 24rpx 28rpx;
+  box-shadow: 0 4rpx 20rpx rgba(15, 23, 42, 0.04);
+}
+
+.form-item {
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid #f1f5f9;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.form-label {
+  display: block;
+  font-size: 26rpx;
+  color: #475569;
+  font-weight: 500;
+  margin-bottom: 14rpx;
+}
+
+.form-input {
+  width: 100%;
+  background: #f8fafc;
+  border-radius: 12rpx;
+  padding: 20rpx 16rpx;
+  font-size: 28rpx;
+  color: #0f172a;
+  box-sizing: border-box;
+}
+
+.form-textarea {
+  width: 100%;
+  height: 180rpx;
+  background: #f8fafc;
+  border-radius: 12rpx;
+  padding: 20rpx 16rpx;
+  font-size: 28rpx;
+  color: #0f172a;
+  box-sizing: border-box;
+  line-height: 1.6;
+}
+
+.picker-row {
+  background: #f8fafc;
+  border-radius: 12rpx;
+  padding: 20rpx 16rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.picker-text {
+  font-size: 28rpx;
+  color: #0f172a;
+
+  &.placeholder {
+    color: #94a3b8;
+  }
+}
+
+.picker-arrow {
+  font-size: 32rpx;
+  color: #94a3b8;
+}
+
+/* 地址选择器 */
+.address-picker-row {
+  background: #f8fafc;
+  border-radius: 12rpx;
+  padding: 20rpx 16rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.quick-address-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-top: 16rpx;
+}
+
+.quick-address-chip {
+  background: #eff6ff;
+  border: 2rpx solid #dbeafe;
+  border-radius: 999rpx;
+  padding: 10rpx 20rpx;
+  margin-right: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.chip-text {
+  font-size: 22rpx;
+  color: #2563eb;
+}
+
+/* 提交 */
+.submit-box {
+  padding: 20rpx;
+}
+
+.submit-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border-radius: 999rpx;
+  padding: 28rpx 0;
+  text-align: center;
+  box-shadow: 0 4rpx 20rpx rgba(99, 102, 241, 0.25);
+
+  &.disabled {
+    background: #cbd5e1;
+    box-shadow: none;
+  }
+}
+
+.submit-text {
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+}
+
+/* 记录 */
+.record-card {
+  background: #ffffff;
+  margin: 0 20rpx;
+  border-radius: 20rpx;
+  padding: 24rpx 28rpx;
+  box-shadow: 0 4rpx 20rpx rgba(15, 23, 42, 0.04);
+}
+
+.record-title-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14rpx;
+}
+
+.record-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.record-total {
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.record-item {
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid #f1f5f9;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.record-header-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8rpx;
+}
+
+.record-name {
+  font-size: 28rpx;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.status-tag {
+  border-radius: 999rpx;
+  padding: 4rpx 14rpx;
+
+  &.status-0 {
+    background: #fef3c7;
+  }
+  &.status-0 .status-text {
+    color: #b45309;
+  }
+
+  &.status-1 {
+    background: #dcfce7;
+  }
+  &.status-1 .status-text {
+    color: #16a34a;
+  }
+
+  &.status-2 {
+    background: #fee2e2;
+  }
+  &.status-2 .status-text {
+    color: #dc2626;
+  }
+}
+
+.status-text {
+  font-size: 20rpx;
+  font-weight: 500;
+}
+
+.record-info {
+  display: block;
+  font-size: 24rpx;
+  color: #475569;
+  line-height: 1.8;
+}
+
+.record-remark {
+  display: block;
+  font-size: 22rpx;
+  color: #dc2626;
+  margin-top: 4rpx;
+}
+
+.record-time {
+  display: block;
+  font-size: 22rpx;
+  color: #94a3b8;
+  margin-top: 6rpx;
+}
+
+.bottom-space {
+  height: 60rpx;
+}
+</style>
