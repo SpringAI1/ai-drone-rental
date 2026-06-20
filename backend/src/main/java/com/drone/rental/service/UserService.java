@@ -79,4 +79,9 @@ public interface UserService extends IService<User> {
      * 用户充值
      */
     void recharge(java.math.BigDecimal amount);
+
+    /**
+     * 给指定用户增加余额（订单取消/退款时用）
+     */
+    void increaseBalance(Long userId, java.math.BigDecimal amount);
 }

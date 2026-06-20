@@ -32,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 订单服务实现类
@@ -106,6 +107,10 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         order.setTotalAmount(totalAmount);
         order.setDepositAmount(BigDecimal.ZERO); // 暂不收押金
         order.setOrderStatus(Constants.ORDER_STATUS_UNPAID);
+        // 保存收货地址（用户手动填写或默认地址，非空时存）
+        if (dto.getDeliveryAddress() != null && !dto.getDeliveryAddress().trim().isEmpty()) {
+            order.setDeliveryAddress(dto.getDeliveryAddress().trim());
+        }
         order.setRemark(dto.getRemark());
 
         this.save(order);
@@ -286,9 +291,21 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
 
-        // 只能取消待支付的订单
-        if (order.getOrderStatus() != Constants.ORDER_STATUS_UNPAID) {
+        // 允许取消的状态：待支付(0) / 已支付(1) / 已发货(2)
+        Integer status = order.getOrderStatus();
+        boolean canCancel = Objects.equals(status, Constants.ORDER_STATUS_UNPAID)
+                || Objects.equals(status, Constants.ORDER_STATUS_PAID)
+                || Objects.equals(status, Constants.ORDER_STATUS_SHIPPED);
+        if (!canCancel) {
             throw new BusinessException(ResultCode.ORDER_CANNOT_CANCEL);
+        }
+
+        // 如果订单已支付，进行退款：余额退还给用户
+        if (Objects.equals(status, Constants.ORDER_STATUS_PAID)
+                || Objects.equals(status, Constants.ORDER_STATUS_SHIPPED)) {
+            if (order.getTotalAmount() != null && order.getTotalAmount().compareTo(BigDecimal.ZERO) > 0) {
+                userService.increaseBalance(order.getUserId(), order.getTotalAmount());
+            }
         }
 
         order.setOrderStatus(Constants.ORDER_STATUS_CANCELLED);

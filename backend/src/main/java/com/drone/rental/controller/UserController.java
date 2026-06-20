@@ -52,9 +52,9 @@ public class UserController {
 
     @Operation(summary = "修改密码")
     @PutMapping("/password")
-    public Result<Void> updatePassword(
-            @Parameter(description = "原密码") @RequestParam String oldPassword,
-            @Parameter(description = "新密码") @RequestParam String newPassword) {
+    public Result<Void> updatePassword(@RequestBody java.util.Map<String, String> params) {
+        String oldPassword = params.getOrDefault("oldPassword", "");
+        String newPassword = params.getOrDefault("newPassword", "");
         userService.updatePassword(oldPassword, newPassword);
         return Result.success();
     }
@@ -85,7 +85,10 @@ public class UserController {
 
     @Operation(summary = "用户充值")
     @PostMapping("/recharge")
-    public Result<Void> recharge(@Parameter(description = "充值金额") @RequestParam java.math.BigDecimal amount) {
+    public Result<Void> recharge(@RequestBody java.util.Map<String, Object> params) {
+        java.math.BigDecimal amount = new java.math.BigDecimal(
+            String.valueOf(params.getOrDefault("amount", 0))
+        );
         userService.recharge(amount);
         return Result.success();
     }

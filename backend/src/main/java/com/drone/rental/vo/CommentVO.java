@@ -31,6 +31,12 @@ public class CommentVO {
     @Schema(description = "无人机型号")
     private String droneModel;
 
+    @Schema(description = "无人机图片")
+    private String droneImage;
+
+    @Schema(description = "无人机品牌")
+    private String droneBrand;
+
     @Schema(description = "订单ID")
     private Long orderId;
 

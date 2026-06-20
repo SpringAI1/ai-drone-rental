@@ -243,21 +243,18 @@ public class DroneServiceImpl extends ServiceImpl<DroneMapper, Drone> implements
             throw new BusinessException(ResultCode.DRONE_NOT_EXIST);
         }
 
-        // 检查上架状态
-        if (drone.getOnShelf() != Constants.ON_SHELF_YES) {
+        // 1. 检查上架状态
+        if (drone.getOnShelf() == null || drone.getOnShelf() != Constants.ON_SHELF_YES) {
             throw new BusinessException(ResultCode.DRONE_OFF_SHELF);
         }
 
-        // 检查无人机状态
-        if (drone.getStatus() != Constants.DRONE_STATUS_AVAILABLE) {
-            if (drone.getStatus() == Constants.DRONE_STATUS_MAINTENANCE) {
-                throw new BusinessException(ResultCode.DRONE_IN_MAINTENANCE);
-            }
-            throw new BusinessException(ResultCode.DRONE_NOT_AVAILABLE);
+        // 2. 维修中的无人机不可租赁
+        if (drone.getStatus() != null && drone.getStatus() == Constants.DRONE_STATUS_MAINTENANCE) {
+            throw new BusinessException(ResultCode.DRONE_IN_MAINTENANCE);
         }
 
-        // 检查库存
-        if (drone.getStock() <= 0) {
+        // 3. 库存 > 0 即可租赁（不依赖 status 字段的 0/1 标记，避免历史数据错误导致无法租赁）
+        if (drone.getStock() == null || drone.getStock() <= 0) {
             throw new BusinessException(ResultCode.DRONE_STOCK_NOT_ENOUGH);
         }
     }

@@ -188,6 +188,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
             Drone drone = droneService.getById(comment.getDroneId());
             if (drone != null) {
                 vo.setDroneModel(drone.getModel());
+                vo.setDroneImage(drone.getImage());
+                vo.setDroneBrand(drone.getBrand());
             }
         }
 

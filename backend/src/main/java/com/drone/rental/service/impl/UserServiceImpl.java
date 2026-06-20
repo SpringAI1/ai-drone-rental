@@ -283,4 +283,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setBalance(user.getBalance().add(amount));
         this.updateById(user);
     }
+
+    @Override
+    public void increaseBalance(Long userId, java.math.BigDecimal amount) {
+        if (userId == null || amount == null || amount.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        User user = this.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST);
+        }
+        if (user.getBalance() == null) {
+            user.setBalance(java.math.BigDecimal.ZERO);
+        }
+        user.setBalance(user.getBalance().add(amount));
+        this.updateById(user);
+    }
 }

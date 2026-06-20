@@ -86,5 +86,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
         String absoluteUploadPath = userDir + "/" + uploadPath;
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations("file:" + absoluteUploadPath);
+        // H5 端 uni-app 通过 /api/uploads/** 代理访问，需要额外映射
+        registry.addResourceHandler("/api/uploads/**")
+                .addResourceLocations("file:" + absoluteUploadPath);
     }
 }
