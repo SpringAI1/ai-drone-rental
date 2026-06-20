@@ -1,6 +1,10 @@
 <template>
   <div>
-    <PageHeader title="系统通知" description="查看所有新订单及系统事件通知" :extra="headerExtra">
+    <PageHeader title="系统通知" description="查看所有新订单及系统事件通知">
+      <template #extra>
+        <el-button type="primary" @click="refresh"><el-icon><Refresh /></el-icon><span style="margin-left:4px">刷新</span></el-button>
+        <el-button @click="handleMarkAll"><el-icon><Check /></el-icon><span style="margin-left:4px">全部已读</span></el-button>
+      </template>
     </PageHeader>
 
     <div class="row" style="margin-bottom: 16px; display: flex; gap: 16px;">
@@ -66,7 +70,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, Check } from '@element-plus/icons-vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -82,11 +86,6 @@ const totalUnread = ref(0)
 const rows = ref([])
 const loading = ref(false)
 const selectedType = ref(0)
-
-const headerExtra = computed(() => [
-  <el-button type="primary" onClick={refresh}><el-icon><Refresh /></el-icon><span style="margin-left:4px">刷新</span></el-button>,
-  <el-button onClick={() => handleMarkAll()}><el-icon><Check /></el-icon><span style="margin-left:4px">全部已读</span></el-button>
-])
 
 const typeText = (t) => {
   const map = { 1: '订单通知', 2: '评论审核', 3: '故障报修', 4: '空域备案', 5: '系统通知' }

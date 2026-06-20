@@ -14,7 +14,7 @@ defineProps({
   type: {
     type: String,
     default: 'default',
-    validator: (v) => ['default', 'primary', 'success', 'warning', 'error', 'info'].includes(v)
+    validator: (v) => ['default', 'primary', 'success', 'warning', 'error', 'danger', 'info'].includes(v)
   },
   size: {
     type: String,
@@ -122,6 +122,17 @@ defineProps({
     .status-tag__dot {
       background: #ef4444;
       box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+    }
+  }
+
+  // 危险 - 深红（已取消/危险状态）
+  &--danger {
+    background: rgba(185, 28, 28, 0.15);
+    color: #b91c1c;
+
+    .status-tag__dot {
+      background: #b91c1c;
+      box-shadow: 0 0 8px rgba(185, 28, 28, 0.5);
     }
   }
 

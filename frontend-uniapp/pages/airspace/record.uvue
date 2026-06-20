@@ -157,7 +157,7 @@
   </view>
 </template>
 
-<script setup lang="uts">
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { submitAirspace, getAirspaceList } from '../../api/airspace'
 

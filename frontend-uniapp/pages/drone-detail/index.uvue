@@ -92,7 +92,7 @@
   </view>
 </template>
 
-<script setup lang="uts">
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { getDroneDetail } from '../../api/drone'
 import { createOrder } from '../../api/order'
@@ -254,7 +254,8 @@ const handleRent = async () => {
               placeholderText: '如需修改请直接编辑',
               success: async (mRes) => {
                 if (!mRes.confirm) return
-                const addr: string = (mRes as any).userText || picked
+                // H5: res.content  小程序/APP: res.userText
+                const addr: string = ((mRes as any).content || (mRes as any).userText || picked) as string
                 if (!addr || addr.trim().length < 3) {
                   uni.showToast({ title: '地址过短', icon: 'none' })
                   return
@@ -272,7 +273,8 @@ const handleRent = async () => {
           placeholderText: '例如：北京市朝阳区 xx 小区 3 号楼',
           success: async (mRes) => {
             if (!mRes.confirm) return
-            const addr: string = (mRes as any).userText || ''
+            // H5: res.content  小程序/APP: res.userText
+            const addr: string = ((mRes as any).content || (mRes as any).userText || '') as string
             if (!addr || addr.trim().length < 3) {
               uni.showToast({ title: '请填写有效地址', icon: 'none' })
               return

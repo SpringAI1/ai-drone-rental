@@ -1,0 +1,619 @@
+<template>
+  <view class="profile-page">
+    <!-- 顶部用户信息（整行蓝色） -->
+    <view class="user-card">
+      <view class="user-info-row" @click="goToProfileEdit">
+        <view class="avatar-box">
+          <image
+            v-if="avatarUrl"
+            class="avatar-img"
+            :src="avatarUrl"
+            mode="aspectFill"
+          />
+          <text v-else class="avatar-text">{{ avatarText }}</text>
+        </view>
+        <view class="user-info">
+          <text class="user-name">{{ userName }}</text>
+          <text class="user-sub">{{ maskedPhone }}</text>
+        </view>
+        <view class="user-arrow">
+          <text class="arrow-icon">›</text>
+        </view>
+      </view>
+
+      <!-- 余额信息 -->
+      <view class="balance-row" @click="handleRecharge">
+        <text class="balance-label">账户余额</text>
+        <text class="balance-value">¥ {{ balance }}</text>
+      </view>
+
+      <!-- 订单快捷入口（整行横排） -->
+      <view class="order-entries">
+        <view
+          class="order-entry"
+          v-for="entry in orderEntries"
+          :key="entry.label"
+          @click="goToOrderList(entry.status)"
+        >
+          <view class="entry-icon-box">
+            <text class="entry-icon">{{ entry.icon }}</text>
+            <view v-if="entry.count > 0" class="entry-badge">
+              <text class="entry-badge-text">{{ entry.count > 99 ? '99+' : entry.count }}</text>
+            </view>
+          </view>
+          <text class="entry-label">{{ entry.label }}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 常用功能 -->
+    <view class="section-card">
+      <view class="section-title-row">
+        <text class="section-title">常用功能</text>
+      </view>
+      <view class="feature-grid">
+        <view
+          class="feature-item"
+          v-for="item in featureList"
+          :key="item.label"
+          @click="handleFeatureClick(item)"
+        >
+          <view class="feature-icon-box">
+            <text class="feature-icon">{{ item.icon }}</text>
+          </view>
+          <text class="feature-label">{{ item.label }}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 账户与安全 -->
+    <view class="section-card">
+      <view class="section-title-row">
+        <text class="section-title">账户与安全</text>
+      </view>
+      <view class="menu-list">
+        <view class="menu-item" @click="goToProfileEdit">
+          <view class="menu-left">
+            <view class="menu-icon-box" style="background: #eff6ff;">
+              <text class="menu-icon" style="color: #2563eb;">👤</text>
+            </view>
+            <text class="menu-label">个人资料</text>
+          </view>
+          <text class="menu-arrow">›</text>
+        </view>
+        <view class="menu-item" @click="goToChangePassword">
+          <view class="menu-left">
+            <view class="menu-icon-box" style="background: #fef3c7;">
+              <text class="menu-icon" style="color: #d97706;">🔒</text>
+            </view>
+            <text class="menu-label">修改密码</text>
+          </view>
+          <text class="menu-arrow">›</text>
+        </view>
+        <view class="menu-item" @click="goToNotifications">
+          <view class="menu-left">
+            <view class="menu-icon-box" style="background: #ede9fe;">
+              <text class="menu-icon" style="color: #7c3aed;">🔔</text>
+            </view>
+            <text class="menu-label">消息通知</text>
+          </view>
+          <view class="menu-right">
+            <text v-if="unreadCount > 0" class="menu-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</text>
+            <text class="menu-arrow">›</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 退出登录 -->
+    <view class="logout-box">
+      <view class="logout-btn" @click="handleLogout">
+        <text class="logout-text">退出登录</text>
+      </view>
+    </view>
+
+    <view class="bottom-space"></view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import { getUserInfo } from '../../api/user'
+import { getUnreadCount } from '../../api/notification'
+import { getOrderStats } from '../../api/order'
+import { useAuth } from '../../stores/auth'
+import { resolveAvatarUrl } from '../../utils/image'
+
+interface OrderEntry {
+  icon: string
+  label: string
+  status: number
+  count: number
+}
+
+interface FeatureItem {
+  icon: string
+  label: string
+  action: string
+}
+
+interface UserInfoData {
+  id: number
+  username: string
+  nickname?: string
+  phone?: string
+  email?: string
+  avatar?: string
+  balance?: number
+  creditScore?: number
+  role?: number
+  qualificationStatus?: number
+}
+
+const auth = useAuth()
+
+const userInfo = ref<UserInfoData | null>(null)
+const unreadCount = ref<number>(0)
+
+const userName = computed(() => {
+  if (userInfo.value?.nickname && userInfo.value.nickname.length > 0) return userInfo.value.nickname
+  if (userInfo.value?.username) return userInfo.value.username
+  return '未登录用户'
+})
+
+const avatarText = computed(() => {
+  const name = userName.value
+  if (!name || name.length === 0) return '用'
+  return name.charAt(0)
+})
+
+const avatarUrl = computed<string>(() => {
+  return resolveAvatarUrl(userInfo.value?.avatar)
+})
+
+const maskedPhone = computed(() => {
+  const phone = userInfo.value?.phone || ''
+  if (!phone || phone.length < 7) {
+    const email = userInfo.value?.email
+    if (email) return email
+    return '请完善个人信息'
+  }
+  return phone.substring(0, 3) + '****' + phone.substring(phone.length - 4)
+})
+
+const balance = computed(() => {
+  const b = userInfo.value?.balance ?? 0
+  return Number(b).toFixed(2)
+})
+
+const orderEntries = ref<OrderEntry[]>([
+  { icon: '💰', label: '待支付', status: 0, count: 0 },
+  { icon: '📦', label: '待发货', status: 1, count: 0 },
+  { icon: '🚚', label: '待收货', status: 2, count: 0 },
+  { icon: '🛸', label: '租赁中', status: 3, count: 0 }
+])
+
+const featureList = ref<FeatureItem[]>([
+  { icon: '✈️', label: '空域备案', action: 'airspace' },
+  { icon: '🔧', label: '故障报修', action: 'fault' },
+  { icon: '🤖', label: 'AI客服', action: 'chat' },
+  { icon: '📋', label: '我的订单', action: 'orders' },
+  { icon: '📜', label: '我的评价', action: 'comments' },
+  { icon: '📍', label: '飞行资质', action: 'qualification' }
+])
+
+const loadUserInfo = async () => {
+  // 优先使用 auth store 中已保存的登录用户（避免显示默认演示用户）
+  const cachedUser = auth.userInfo.value
+  if (cachedUser && cachedUser.username && cachedUser.username !== 'demo') {
+    userInfo.value = cachedUser as UserInfoData
+  }
+  try {
+    const res = await getUserInfo()
+    if (res.data) {
+      userInfo.value = res.data as UserInfoData
+      auth.updateUserInfo(res.data)
+    }
+  } catch (err) {
+    console.error('获取用户信息失败', err)
+    const cached = auth.userInfo.value
+    if (cached && !userInfo.value) {
+      userInfo.value = cached as UserInfoData
+    }
+  }
+}
+
+const loadOrderStats = async () => {
+  try {
+    const res = await getOrderStats()
+    const stats = (res.data as any) || {}
+    const newEntries: OrderEntry[] = [
+      { icon: '💰', label: '待支付', status: 0, count: stats.pendingPay || 0 },
+      { icon: '📦', label: '待发货', status: 1, count: stats.pendingShip || 0 },
+      { icon: '🚚', label: '待收货', status: 2, count: stats.pendingReceive || 0 },
+      { icon: '🛸', label: '租赁中', status: 3, count: stats.renting || 0 }
+    ]
+    orderEntries.value = newEntries
+  } catch (err) {
+    console.error('获取订单统计失败', err)
+  }
+}
+
+const loadUnreadCount = async () => {
+  try {
+    const res = await getUnreadCount()
+    unreadCount.value = (res.data as any) || 0
+  } catch (err) {
+    console.error('获取未读数量失败', err)
+  }
+}
+
+const goToProfileEdit = () => {
+  uni.navigateTo({ url: '/pages/user/profile-edit' })
+}
+
+const goToChangePassword = () => {
+  uni.navigateTo({ url: '/pages/user/change-password' })
+}
+
+const goToNotifications = () => {
+  uni.navigateTo({ url: '/pages/user/notifications' })
+}
+
+const handleRecharge = () => {
+  uni.showToast({ title: '请使用余额充值', icon: 'none' })
+}
+
+const goToOrderList = (status: number) => {
+  uni.switchTab({ url: '/pages/orders/list' })
+}
+
+const handleFeatureClick = (item: FeatureItem) => {
+  if (item.action === 'airspace') {
+    uni.navigateTo({ url: '/pages/airspace/record' })
+  } else if (item.action === 'fault') {
+    uni.navigateTo({ url: '/pages/fault/report' })
+  } else if (item.action === 'chat') {
+    uni.navigateTo({ url: '/pages/chat/index' })
+  } else if (item.action === 'orders') {
+    uni.switchTab({ url: '/pages/orders/list' })
+  } else if (item.action === 'comments') {
+    uni.navigateTo({ url: '/pages/orders/comment?type=my' })
+  } else if (item.action === 'qualification') {
+    uni.navigateTo({ url: '/pages/qualification/index' })
+  }
+}
+
+const handleLogout = () => {
+  uni.showModal({
+    title: '提示',
+    content: '确定要退出登录吗？',
+    success: (res) => {
+      if (res.confirm) {
+        auth.logout()
+        uni.showToast({ title: '已退出登录', icon: 'none' })
+        setTimeout(() => {
+          uni.reLaunch({ url: '/pages/user/login' })
+        }, 800)
+      }
+    }
+  })
+}
+
+onShow(() => {
+  loadUserInfo()
+  loadOrderStats()
+  loadUnreadCount()
+})
+
+onMounted(() => {
+  loadUserInfo()
+  loadOrderStats()
+  loadUnreadCount()
+})
+</script>
+
+<style lang="scss">
+page {
+  min-height: 100vh;
+  background: #f1f5f9;
+}
+
+.profile-page {
+  min-height: 100vh;
+  background: #f1f5f9;
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 用户信息卡片 */
+.user-card {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  padding: 48rpx 28rpx 28rpx;
+  box-sizing: border-box;
+}
+
+.user-info-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.avatar-box {
+  width: 112rpx;
+  height: 112rpx;
+  background: #ffffff;
+  border-radius: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 20rpx;
+  overflow: hidden;
+  border: 4rpx solid rgba(255, 255, 255, 0.3);
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 56rpx;
+}
+
+.avatar-text {
+  font-size: 44rpx;
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.user-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 8rpx;
+}
+
+.user-sub {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.user-arrow {
+  flex-shrink: 0;
+}
+
+.arrow-icon {
+  font-size: 36rpx;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* 余额信息 */
+.balance-row {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.balance-label {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.balance-value {
+  font-size: 32rpx;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* 订单快捷入口 */
+.order-entries {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 16rpx;
+  padding: 20rpx 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.order-entry {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.entry-icon-box {
+  position: relative;
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8rpx;
+}
+
+.entry-icon {
+  font-size: 32rpx;
+}
+
+.entry-badge {
+  position: absolute;
+  top: -4rpx;
+  right: -8rpx;
+  background: #ef4444;
+  border-radius: 999rpx;
+  padding: 2rpx 8rpx;
+  min-width: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.entry-badge-text {
+  font-size: 18rpx;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.entry-label {
+  font-size: 22rpx;
+  color: #ffffff;
+}
+
+/* 通用卡片 section */
+.section-card {
+  margin: 20rpx 20rpx 0;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 20rpx;
+  box-sizing: border-box;
+}
+
+.section-title-row {
+  margin-bottom: 16rpx;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* 常用功能网格 */
+.feature-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.feature-item {
+  width: 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16rpx 4rpx;
+}
+
+.feature-icon-box {
+  width: 72rpx;
+  height: 72rpx;
+  background: #eff6ff;
+  border-radius: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10rpx;
+}
+
+.feature-icon {
+  font-size: 36rpx;
+}
+
+.feature-label {
+  font-size: 22rpx;
+  color: #475569;
+}
+
+/* 菜单列表 */
+.menu-list {
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.menu-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 0rpx;
+
+  &:not(:last-child) {
+    border-bottom: 2rpx solid #f1f5f9;
+  }
+}
+
+.menu-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.menu-icon-box {
+  width: 56rpx;
+  height: 56rpx;
+  background: #f8fafc;
+  border-radius: 14rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+
+.menu-icon {
+  font-size: 30rpx;
+}
+
+.menu-label {
+  font-size: 28rpx;
+  color: #0f172a;
+}
+
+.menu-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.menu-badge {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 20rpx;
+  border-radius: 999rpx;
+  padding: 2rpx 10rpx;
+  margin-right: 8rpx;
+  font-weight: 600;
+}
+
+.menu-arrow {
+  font-size: 32rpx;
+  color: #cbd5e1;
+}
+
+/* 退出登录 */
+.logout-box {
+  margin: 32rpx 20rpx 0;
+}
+
+.logout-btn {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logout-text {
+  font-size: 28rpx;
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.bottom-space {
+  height: 60rpx;
+}
+</style>

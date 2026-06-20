@@ -73,7 +73,7 @@
   </view>
 </template>
 
-<script setup lang="uts">
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getOrderDetail, payOrder } from '../../api/order'
 import { getUserInfo } from '../../api/user'

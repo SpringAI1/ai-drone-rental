@@ -1,0 +1,136 @@
+// =====================================================
+// 翱翔无人机租赁系统 - 主题变量
+// 风格：Clean Light SaaS (与Web端一致)
+// =====================================================
+
+// ================= 颜色系统 =================
+
+// 主背景色 - 浅色系
+$slate-900: #ffffff;
+$slate-800: #ffffff;
+$slate-700: #f1f5f9;
+$slate-600: #e2e8f0;
+$slate-500: #94a3b8;
+$slate-400: #64748b;
+$slate-300: #475569;
+$slate-200: #334155;
+$slate-100: #1e293b;
+
+// 品牌色 - Electric Blue
+$electric-blue: #3b82f6;
+$electric-blue-light: #60a5fa;
+$electric-blue-dark: #2563eb;
+$electric-cyan: #0ea5e9;
+
+// 状态色
+$neon-success: #22c55e;
+$neon-success-light: #4ade80;
+$neon-success-glow: rgba(34, 197, 94, 0.15);
+
+$neon-warning: #f59e0b;
+$neon-warning-light: #fbbf24;
+$neon-warning-glow: rgba(245, 158, 11, 0.15);
+
+$neon-error: #ef4444;
+$neon-error-light: #f87171;
+$neon-error-glow: rgba(239, 68, 68, 0.15);
+
+$neon-info: #3b82f6;
+$neon-info-light: #60a5fa;
+$neon-info-glow: rgba(59, 130, 246, 0.15);
+
+// 文字颜色
+$text-primary: #0f172a;
+$text-secondary: #475569;
+$text-muted: #94a3b8;
+$text-dark: #0f172a;
+
+// ================= 间距系统 =================
+$spacing-xs: 8rpx;
+$spacing-sm: 16rpx;
+$spacing-md: 32rpx;
+$spacing-lg: 48rpx;
+$spacing-xl: 64rpx;
+$spacing-2xl: 96rpx;
+$spacing-3xl: 128rpx;
+
+// ================= 圆角系统 =================
+$radius-sm: 16rpx;
+$radius-md: 24rpx;
+$radius-lg: 32rpx;
+$radius-xl: 40rpx;
+$radius-2xl: 48rpx;
+$radius-3xl: 56rpx;
+
+// ================= 阴影系统 =================
+$shadow-sm: 0 2rpx 6rpx rgba(0, 0, 0, 0.06), 0 2rpx 4rpx rgba(0, 0, 0, 0.04);
+$shadow-md: 0 8rpx 12rpx rgba(0, 0, 0, 0.05), 0 4rpx 8rpx rgba(0, 0, 0, 0.03);
+$shadow-lg: 0 20rpx 30rpx rgba(0, 0, 0, 0.06), 0 8rpx 12rpx rgba(0, 0, 0, 0.03);
+$shadow-xl: 0 40rpx 50rpx rgba(0, 0, 0, 0.08), 0 16rpx 20rpx rgba(0, 0, 0, 0.03);
+
+$shadow-glow-blue: 0 8rpx 28rpx rgba(59, 130, 246, 0.15);
+$shadow-glow-cyan: 0 8rpx 28rpx rgba(14, 165, 233, 0.15);
+
+// ================= 卡片/面板背景 =================
+$glass-bg: rgba(255, 255, 255, 0.9);
+$glass-bg-light: rgba(241, 245, 249, 0.7);
+$glass-border: rgba(226, 232, 240, 0.8);
+$glass-blur: 12px;
+
+// ================= 字体系统 =================
+$font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+$font-size-xs: 24rpx;
+$font-size-sm: 28rpx;
+$font-size-base: 32rpx;
+$font-size-lg: 36rpx;
+$font-size-xl: 40rpx;
+$font-size-2xl: 48rpx;
+$font-size-3xl: 60rpx;
+$font-size-4xl: 72rpx;
+
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+
+// ================= 动画 =================
+$transition-fast: 0.15s ease;
+$transition-base: 0.3s ease;
+$transition-slow: 0.5s ease;
+
+// ================= UniApp 变量 =================
+$uni-color-primary: #3b82f6;
+$uni-color-success: #22c55e;
+$uni-color-warning: #f59e0b;
+$uni-color-error: #ef4444;
+
+$uni-text-color: #0f172a;
+$uni-text-color-inverse: #ffffff;
+$uni-text-color-grey: #94a3b8;
+$uni-text-color-placeholder: #94a3b8;
+$uni-text-color-disable: #94a3b8;
+
+$uni-bg-color: #ffffff;
+$uni-bg-color-grey: #f1f5f9;
+$uni-bg-color-hover: #f8fafc;
+$uni-bg-color-mask: rgba(0, 0, 0, 0.5);
+
+$uni-border-color: #e2e8f0;
+
+$uni-font-size-sm: 28rpx;
+$uni-font-size-base: 32rpx;
+$uni-font-size-lg: 36rpx;
+
+$uni-border-radius-sm: 16rpx;
+$uni-border-radius-base: 24rpx;
+$uni-border-radius-lg: 32rpx;
+$uni-border-radius-circle: 50%;
+
+$uni-spacing-row-sm: 20rpx;
+$uni-spacing-row-base: 40rpx;
+$uni-spacing-row-lg: 60rpx;
+
+$uni-spacing-col-sm: 16rpx;
+$uni-spacing-col-base: 32rpx;
+$uni-spacing-col-lg: 48rpx;
