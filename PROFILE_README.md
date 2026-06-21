@@ -4,19 +4,27 @@
 
 <br/>
 
-## 正在学习和成长的开发者，喜欢把想法写成简单、清晰、可运行的代码
-
-### `Console.log("Hello, GitHub!")`
-
-</div>
+# 👋 Hello, 我是 chenxi
 
 <br/>
 
 ## 🛠 技术栈
 
-<p align="center">
-  <a href="#"><img src="https://skillicons.dev/icons?i=java,spring,maven,vue,ts,vite,html,css,sass,redis,mysql,idea,vscode,git,github,docker,nginx,postman&theme=dark&perline=13&titles=true" alt="Tech Stack" /></a>
+<p>
+  <img src="https://img.shields.io/badge/Java?style=for-the-badge&logo=openjdk&logoColor=white&labelColor=FFB6C1&color=FF1493" alt="Java" />
+  <img src="https://img.shields.io/badge/Spring?style=for-the-badge&logo=spring&logoColor=white&labelColor=FFB6C1&color=FF1493" alt="Spring" />
+  <img src="https://img.shields.io/badge/MySQL?style=for-the-badge&logo=mysql&logoColor=white&labelColor=FFB6C1&color=FF1493" alt="MySQL" />
+  <img src="https://img.shields.io/badge/Redis?style=for-the-badge&logo=redis&logoColor=white&labelColor=FFB6C1&color=FF1493" alt="Redis" />
+  <img src="https://img.shields.io/badge/Vue.js?style=for-the-badge&logo=vuedotjs&logoColor=white&labelColor=FFB6C1&color=FF1493" alt="Vue.js" />
+  <img src="https://img.shields.io/badge/TypeScript?style=for-the-badge&logo=typescript&logoColor=white&labelColor=FFB6C1&color=FF1493" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Vite?style=for-the-badge&logo=vite&logoColor=white&labelColor=FFB6C1&color=FF1493" alt="Vite" />
+  <img src="https://img.shields.io/badge/HTML5?style=for-the-badge&logo=html5&logoColor=white&labelColor=FFB6C1&color=FF1493" alt="HTML5" />
+  <img src="https://img.shields.io/badge/CSS3?style=for-the-badge&logo=css&logoColor=white&labelColor=FFB6C1&color=FF1493" alt="CSS3" />
+  <img src="https://img.shields.io/badge/Git?style=for-the-badge&logo=git&logoColor=white&labelColor=FFB6C1&color=FF1493" alt="Git" />
+  <img src="https://img.shields.io/badge/Docker?style=for-the-badge&logo=docker&logoColor=white&labelColor=FFB6C1&color=FF1493" alt="Docker" />
 </p>
+
+</div>
 
 <br/>
 
