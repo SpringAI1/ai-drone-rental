@@ -113,7 +113,8 @@ PROFILE_README.md
 /e2e_*.js
 /e2e_*.mjs
 /e2e_*.log
-/scripts/
+# scripts/ 整体忽略，但保留 verify_real_order.py / verify_pay_flow.py 等真实落库验证脚本
+/scripts/*
 
 # 数据库临时文件
 /drone_rental.db
