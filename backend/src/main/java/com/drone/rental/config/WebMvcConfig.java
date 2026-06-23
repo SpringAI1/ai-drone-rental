@@ -58,8 +58,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/drone/types",
                         "/drone/**/comments",
                         "/drone/**/image",
-                        // AI接口
-                        "/ai/**",
+                        // AI V1/V2 公共接口（无登录）
+                        "/ai/v1/**",
+                        "/ai/v2/**",
+                        // V3 公共接口：状态 + 知识库测试检索 + 工具列表
+                        "/ai/v3/status",
+                        "/ai/v3/rag/search",
+                        "/ai/v3/tools",
+                        // MCP Server (Model Context Protocol) 端点
+                        // 让 Claude Desktop / Cursor 等外部 MCP 客户端可匿名访问
+                        "/mcp/**",
                         // 公开接口
                         "/public/**",
                         // WebSocket（握手时鉴权由处理器内部完成）

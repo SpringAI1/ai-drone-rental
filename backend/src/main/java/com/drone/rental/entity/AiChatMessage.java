@@ -19,6 +19,7 @@ public class AiChatMessage implements Serializable {
     private Long id;
 
     @Schema(description = "会话ID（UUID）")
+    @TableField(value = "session_id")
     private String conversationId;
 
     @Schema(description = "用户ID（未登录时为空）")
@@ -34,6 +35,7 @@ public class AiChatMessage implements Serializable {
     private String model;
 
     @Schema(description = "消耗的token数")
+    @TableField(value = "token_count")
     private Integer tokens;
 
     @Schema(description = "创建时间")

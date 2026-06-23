@@ -83,7 +83,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
-import { chat } from '../../api/ai'
+import { chat, streamChatMessage, getAiStatus } from '../../api/ai'
 
 const STORAGE_KEY_CONVERSATION = 'ai_chat_conversation_id'
 const STORAGE_KEY_MESSAGES = 'ai_chat_messages'
@@ -101,6 +101,7 @@ const conversationId = ref('')
 const scrollTop = ref(0)
 const loading = ref(false)
 const aiEnabled = ref(true)
+let currentStream: { abort: () => void } | null = null
 
 // 初始化：从本地存储恢复会话
 onMounted(() => {
@@ -120,12 +121,22 @@ onMounted(() => {
   } else {
     messages.value = [{
       id: 1,
-      content: '您好！我是无人机租赁系统的 AI 客服助手 🛸\n\n我可以帮您：\n1. 查询设备信息和价格\n2. 了解租赁流程和规则\n3. 解答订单和支付问题\n4. 推荐适合的无人机\n\n请问有什么可以帮助您的吗？',
+      content: '您好！我是翱翔无人机租赁平台的 AI 智能客服「小飞」🛸\n\n我可以帮您：\n• 推荐合适的无人机机型\n• 解答租赁流程 / 法规 / 保险问题\n• 查询订单 / 报修 / 资质状态\n• 一键智能下单\n\n请告诉我您想咨询的内容吧～',
       isUser: false,
       time: new Date()
     }]
   }
+  refreshStatus()
 })
+
+const refreshStatus = async () => {
+  try {
+    const res = await getAiStatus()
+    aiEnabled.value = !!res?.data?.enabled
+  } catch (e) {
+    aiEnabled.value = false
+  }
+}
 
 const persistMessages = () => {
   uni.setStorageSync(STORAGE_KEY_MESSAGES, messages.value.map(m => ({
@@ -176,57 +187,51 @@ const sendMessage = async () => {
   scrollToBottom()
   persistMessages()
 
+  // 立刻放一个空的 AI 气泡，等待流式逐字填充
+  const aiIndex = messages.value.length
+  const aiMessage: Message = {
+    id: aiIndex + 1,
+    content: '',
+    isUser: false,
+    time: new Date()
+  }
+  messages.value.push(aiMessage)
   loading.value = true
+  scrollToBottom()
 
-  try {
-    const res = await chat({
-      message: content,
-      conversationId: conversationId.value
-    })
+  // 中断之前的流
+  if (currentStream) currentStream.abort()
 
-    let reply = ''
-    if (res.data) {
-      if (res.data.reply) {
-        reply = res.data.reply
-      } else if (res.data.content) {
-        reply = res.data.content
-      } else if (typeof res.data === 'string') {
-        reply = res.data
+  currentStream = streamChatMessage(
+    { message: content, conversationId: conversationId.value },
+    {
+      onChunk: (chunk) => {
+        aiMessage.content += chunk
+        messages.value[aiIndex] = { ...aiMessage }
+        scrollToBottom()
+      },
+      onDone: (full) => {
+        aiMessage.content = full || aiMessage.content
+        messages.value[aiIndex] = { ...aiMessage }
+        loading.value = false
+        currentStream = null
+        scrollToBottom()
+        persistMessages()
+      },
+      onError: (err) => {
+        console.error('SSE error', err)
+        aiMessage.content =
+          (aiMessage.content || '') +
+          (aiMessage.content ? '\n\n' : '') +
+          '⚠️ 抱歉，AI 服务连接异常，请稍后重试或拨打人工客服 400-800-8888'
+        messages.value[aiIndex] = { ...aiMessage }
+        loading.value = false
+        currentStream = null
+        scrollToBottom()
+        persistMessages()
       }
     }
-
-    if (!reply || reply.length === 0) {
-      reply = '抱歉，我暂时无法回答这个问题。您可以拨打人工客服：400-800-8888'
-    }
-
-    if (res.data && res.data.conversationId) {
-      conversationId.value = res.data.conversationId
-      uni.setStorageSync(STORAGE_KEY_CONVERSATION, res.data.conversationId)
-    }
-
-    const aiMessage: Message = {
-      id: messages.value.length + 1,
-      content: reply,
-      isUser: false,
-      time: new Date()
-    }
-    messages.value.push(aiMessage)
-    scrollToBottom()
-    persistMessages()
-  } catch (err) {
-    console.error('AI 对话失败', err)
-    const errorMessage: Message = {
-      id: messages.value.length + 1,
-      content: '网络连接异常，请稍后重试。您也可以拨打人工客服：400-800-8888',
-      isUser: false,
-      time: new Date()
-    }
-    messages.value.push(errorMessage)
-    scrollToBottom()
-    persistMessages()
-  } finally {
-    loading.value = false
-  }
+  )
 }
 
 const goBack = () => {

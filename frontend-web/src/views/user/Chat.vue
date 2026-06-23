@@ -90,7 +90,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { sendChatMessage } from '@/api/ai'
+import { streamChatMessage, getAiStatus } from '@/api/ai'
 import { ElMessage } from 'element-plus'
 import { ChatDotRound, Monitor, Promotion } from '@element-plus/icons-vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -101,6 +101,8 @@ const messages = ref([])
 const inputMessage = ref('')
 const loading = ref(false)
 const messagesRef = ref(null)
+const aiOnline = ref(true)
+let currentAbort = null
 
 const userInitial = computed(() => {
   return authStore.user?.nickname?.charAt(0) || 'U'
@@ -125,32 +127,45 @@ const scrollToBottom = async () => {
 const sendMessage = async () => {
   const message = inputMessage.value.trim()
   if (!message || loading.value) return
-  
-  messages.value.push({
-    role: 'user',
-    content: message
-  })
+
+  messages.value.push({ role: 'user', content: message })
   inputMessage.value = ''
+  // 立即放一个空的 AI 气泡，等待流式逐字填充
+  const aiIndex = messages.value.length
+  messages.value.push({ role: 'ai', content: '' })
   loading.value = true
-  
   await scrollToBottom()
-  
-  try {
-    const res = await sendChatMessage(message)
-    if (res.success) {
-      messages.value.push({
-        role: 'ai',
-        content: res.data
-      })
-    } else {
-      ElMessage.error(res.message || 'AI回复失败')
+
+  if (currentAbort) currentAbort.abort()
+  const ac = new AbortController()
+  currentAbort = ac
+
+  await streamChatMessage(
+    { message, conversationId: '' },
+    {
+      signal: ac.signal,
+      onChunk: (chunk) => {
+        messages.value[aiIndex].content += chunk
+        scrollToBottom()
+      },
+      onDone: (full) => {
+        messages.value[aiIndex].content = full || messages.value[aiIndex].content
+        loading.value = false
+        currentAbort = null
+        scrollToBottom()
+      },
+      onError: (err) => {
+        console.error('SSE error', err)
+        messages.value[aiIndex].content =
+          (messages.value[aiIndex].content || '') +
+          (messages.value[aiIndex].content ? '\n\n' : '') +
+          '⚠️ 抱歉，AI 服务连接异常，请稍后重试或拨打人工客服 400-800-8888'
+        loading.value = false
+        currentAbort = null
+        scrollToBottom()
+      }
     }
-  } catch (error) {
-    ElMessage.error('网络错误，请稍后重试')
-  } finally {
-    loading.value = false
-    await scrollToBottom()
-  }
+  )
 }
 
 const askQuickQuestion = (question) => {
@@ -158,8 +173,18 @@ const askQuickQuestion = (question) => {
   sendMessage()
 }
 
+const loadStatus = async () => {
+  try {
+    const res = await getAiStatus()
+    aiOnline.value = !!res?.data?.enabled
+  } catch (e) {
+    aiOnline.value = false
+  }
+}
+
 onMounted(() => {
   scrollToBottom()
+  loadStatus()
 })
 </script>
 
