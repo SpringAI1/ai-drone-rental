@@ -104,13 +104,20 @@ PROFILE_README.md
 
 # 一次性脚本与文档
 /test_*.sh
+/test_*.js
+/test_*.py
+/test_sys.sh
+/test_ws.*
 /verify_*.sh
 /env_check.sh
+/e2e_*.js
 /e2e_*.mjs
+/e2e_*.log
 /scripts/
 
 # 数据库临时文件
 /drone_rental.db
 /drone_rental.db.bak
+/backend/tmp/
 
 # 结束

@@ -16,6 +16,7 @@ import com.drone.rental.security.UserContext;
 import com.drone.rental.service.DroneService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -30,6 +31,8 @@ public class DroneServiceImpl extends ServiceImpl<DroneMapper, Drone> implements
     private DroneStockLogMapper stockLogMapper;
 
     @Override
+    @Cacheable(value = "droneList",
+               key = "#pageNum + '-' + #pageSize + '-' + (#keyword ?: '') + '-' + (#brand ?: '') + '-' + (#type ?: '') + '-' + (#status ?: -1) + '-' + (#minPrice ?: -1) + '-' + (#maxPrice ?: -1) + '-' + #sortBy + '-' + #sortOrder")
     public IPage<Drone> pageAvailableDrones(Integer pageNum, Integer pageSize, String keyword, String brand,
                                              String type, Integer status, java.math.BigDecimal minPrice,
                                              java.math.BigDecimal maxPrice, String sortBy, String sortOrder) {
@@ -127,6 +130,8 @@ public class DroneServiceImpl extends ServiceImpl<DroneMapper, Drone> implements
     }
 
     @Override
+    
+    @Cacheable(value = "droneDetail", key = "#id")
     public Drone getDroneDetail(Long id) {
         Drone drone = this.getById(id);
         if (drone == null) {
@@ -316,6 +321,7 @@ public class DroneServiceImpl extends ServiceImpl<DroneMapper, Drone> implements
     }
 
     @Override
+    @Cacheable(value = "droneBrands", key = "'all'")
     public java.util.List<String> getAllBrands() {
         LambdaQueryWrapper<Drone> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Drone::getOnShelf, Constants.ON_SHELF_YES);
@@ -330,6 +336,7 @@ public class DroneServiceImpl extends ServiceImpl<DroneMapper, Drone> implements
     }
 
     @Override
+    @Cacheable(value = "droneTypes", key = "'all'")
     public java.util.List<String> getAllTypes() {
         LambdaQueryWrapper<Drone> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Drone::getOnShelf, Constants.ON_SHELF_YES);

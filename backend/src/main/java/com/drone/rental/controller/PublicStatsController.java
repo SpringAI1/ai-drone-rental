@@ -13,6 +13,8 @@ import com.drone.rental.mapper.UserMapper;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -22,6 +24,10 @@ import java.util.Map;
 @RestController
 @RequestMapping("/public")
 public class PublicStatsController {
+
+    @Autowired
+    @Lazy
+    private PublicStatsController self;
 
     @Autowired
     private UserMapper userMapper;
@@ -38,6 +44,11 @@ public class PublicStatsController {
     @Operation(summary = "获取首页统计数据")
     @GetMapping("/stats")
     public Result<Map<String, Object>> getStats() {
+        return Result.success(self.loadStats());
+    }
+
+    @Cacheable(value = "dashboardStats", key = "'public'")
+    public Map<String, Object> loadStats() {
         Map<String, Object> stats = new HashMap<>();
 
         Long totalDrones = droneMapper.selectCount(new LambdaQueryWrapper<Drone>()
@@ -67,6 +78,6 @@ public class PublicStatsController {
             stats.put("positiveRate", 0);
         }
 
-        return Result.success(stats);
+        return stats;
     }
 }

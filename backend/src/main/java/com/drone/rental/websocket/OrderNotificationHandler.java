@@ -39,8 +39,13 @@ public class OrderNotificationHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        String token = extractToken(session);
+        // 优先从 HandshakeInterceptor 放在 attributes 里的 token 拿（Spring WebSocket 协议升级后 session.getUri() 经常丢失 query string）
+        String token = (String) session.getAttributes().get("token");
         if (token == null || token.isEmpty()) {
+            token = extractToken(session);
+        }
+        if (token == null || token.isEmpty()) {
+            log.warn("[WS] 握手未携带 token, uri={}", session.getUri());
             session.close(CloseStatus.NOT_ACCEPTABLE.withReason("missing token"));
             return;
         }

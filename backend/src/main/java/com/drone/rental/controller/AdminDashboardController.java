@@ -7,6 +7,8 @@ import com.drone.rental.mapper.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -19,6 +21,10 @@ import java.util.*;
 @RestController
 @RequestMapping("/admin/dashboard")
 public class AdminDashboardController {
+
+    @Autowired
+    @Lazy
+    private AdminDashboardController self;
 
     @Autowired
     private UserMapper userMapper;
@@ -38,6 +44,11 @@ public class AdminDashboardController {
     @Operation(summary = "获取统计数据")
     @GetMapping("/stats")
     public Result<Map<String, Object>> getStats() {
+        return Result.success(self.loadStats());
+    }
+
+    @Cacheable(value = "dashboardStats", key = "'admin'")
+    public Map<String, Object> loadStats() {
         Map<String, Object> stats = new HashMap<>();
 
         // 今日开始时间
@@ -100,7 +111,7 @@ public class AdminDashboardController {
                 .eq(Drone::getDeleted, 0));
         stats.put("totalDrones", totalDrones);
 
-        return Result.success(stats);
+        return stats;
     }
 
     @Operation(summary = "获取收入趋势")
@@ -113,14 +124,11 @@ public class AdminDashboardController {
         LocalDate today = LocalDate.now();
 
         if ("year".equals(period)) {
-            // 按月份统计本年数据
             int currentYear = today.getYear();
             for (int month = 1; month <= 12; month++) {
                 dates.add(month + "月");
-
                 LocalDate monthStart = LocalDate.of(currentYear, month, 1);
                 LocalDate monthEnd = monthStart.plusMonths(1).minusDays(1);
-
                 LocalDateTime startTime = LocalDateTime.of(monthStart, LocalTime.MIN);
                 LocalDateTime endTime = LocalDateTime.of(monthEnd, LocalTime.MAX);
 
@@ -134,13 +142,10 @@ public class AdminDashboardController {
                 values.add(monthRevenue);
             }
         } else {
-            // 按天统计（本周7天，本月30天）
             int days = "week".equals(period) ? 7 : 30;
-
             for (int i = days - 1; i >= 0; i--) {
                 LocalDate date = today.minusDays(i);
-                dates.add(date.toString().substring(5)); // MM-DD格式
-
+                dates.add(date.toString().substring(5));
                 LocalDateTime dayStart = LocalDateTime.of(date, LocalTime.MIN);
                 LocalDateTime dayEnd = LocalDateTime.of(date, LocalTime.MAX);
 
@@ -173,7 +178,6 @@ public class AdminDashboardController {
         for (int i = days - 1; i >= 0; i--) {
             LocalDate date = today.minusDays(i);
             dates.add(date.toString().substring(5));
-
             LocalDateTime dayStart = LocalDateTime.of(date, LocalTime.MIN);
             LocalDateTime dayEnd = LocalDateTime.of(date, LocalTime.MAX);
 
@@ -190,6 +194,11 @@ public class AdminDashboardController {
     @Operation(summary = "获取热门设备")
     @GetMapping("/popular-drones")
     public Result<List<Map<String, Object>>> getPopularDrones(@RequestParam(defaultValue = "5") Integer limit) {
+        return Result.success(self.loadPopularDrones(limit));
+    }
+
+    @Cacheable(value = "popularDrones", key = "#limit")
+    public List<Map<String, Object>> loadPopularDrones(Integer limit) {
         List<Map<String, Object>> list = new ArrayList<>();
 
         List<Drone> drones = droneMapper.selectList(new LambdaQueryWrapper<Drone>()
@@ -198,7 +207,7 @@ public class AdminDashboardController {
                 .last("LIMIT " + limit));
 
         if (drones.isEmpty()) {
-            return Result.success(list);
+            return list;
         }
 
         List<Long> droneIds = drones.stream().map(Drone::getId).collect(java.util.stream.Collectors.toList());
@@ -220,13 +229,17 @@ public class AdminDashboardController {
         }
 
         list.sort((a, b) -> ((Long)b.get("rentCount")).compareTo((Long)a.get("rentCount")));
-
-        return Result.success(list);
+        return list;
     }
 
     @Operation(summary = "获取最新订单")
     @GetMapping("/recent-orders")
     public Result<List<Map<String, Object>>> getRecentOrders(@RequestParam(defaultValue = "5") Integer limit) {
+        return Result.success(self.loadRecentOrders(limit));
+    }
+
+    @Cacheable(value = "recentOrders", key = "#limit")
+    public List<Map<String, Object>> loadRecentOrders(Integer limit) {
         List<Map<String, Object>> list = new ArrayList<>();
 
         List<RentalOrder> orders = orderMapper.selectList(new LambdaQueryWrapper<RentalOrder>()
@@ -234,7 +247,7 @@ public class AdminDashboardController {
                 .last("LIMIT " + limit));
 
         if (orders.isEmpty()) {
-            return Result.success(list);
+            return list;
         }
 
         List<Long> userIds = orders.stream().map(RentalOrder::getUserId).collect(java.util.stream.Collectors.toList());
@@ -256,7 +269,7 @@ public class AdminDashboardController {
             list.add(item);
         }
 
-        return Result.success(list);
+        return list;
     }
 
     @Operation(summary = "获取待办事项统计")
@@ -264,23 +277,19 @@ public class AdminDashboardController {
     public Result<Map<String, Object>> getTodos() {
         Map<String, Object> todos = new HashMap<>();
 
-        // 待审核资质
         Long pendingAudit = qualificationMapper.selectCount(new LambdaQueryWrapper<UserQualification>()
                 .eq(UserQualification::getAuditStatus, 0)
                 .eq(UserQualification::getDeleted, 0));
         todos.put("audit", pendingAudit);
 
-        // 待发货订单
         Long pendingShip = orderMapper.selectCount(new LambdaQueryWrapper<RentalOrder>()
                 .eq(RentalOrder::getOrderStatus, 1));
         todos.put("ship", pendingShip);
 
-        // 待确认退租
         Long pendingReturn = orderMapper.selectCount(new LambdaQueryWrapper<RentalOrder>()
                 .eq(RentalOrder::getOrderStatus, 4));
         todos.put("return", pendingReturn);
 
-        // 待处理维修
         Long pendingMaintenance = faultReportMapper.selectCount(new LambdaQueryWrapper<FaultReport>()
                 .eq(FaultReport::getAuditStatus, 0)
                 .eq(FaultReport::getDeleted, 0));
