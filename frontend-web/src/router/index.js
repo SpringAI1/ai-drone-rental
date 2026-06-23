@@ -199,6 +199,12 @@ const routes = [
         name: 'AdminNotifications',
         component: () => import('@/views/admin/NotificationManagement.vue'),
         meta: { title: '系统通知' }
+      },
+      {
+        path: 'profile',
+        name: 'AdminProfile',
+        component: () => import('@/views/admin/AdminProfile.vue'),
+        meta: { title: '个人中心' }
       }
     ]
   },

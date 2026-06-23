@@ -114,6 +114,9 @@
                 <el-dropdown-item command="home">
                   <el-icon><HomeFilled /></el-icon>管理控制台
                 </el-dropdown-item>
+                <el-dropdown-item command="profile">
+                  <el-icon><User /></el-icon>个人中心
+                </el-dropdown-item>
                 <el-dropdown-item divided command="logout">
                   <el-icon><SwitchButton /></el-icon>退出登录
                 </el-dropdown-item>
@@ -371,6 +374,9 @@ const handleCommand = async (command) => {
   switch (command) {
     case 'home':
       router.push('/admin')
+      break
+    case 'profile':
+      router.push('/admin/profile')
       break
     case 'logout':
       if (logoutConfirming.value) return

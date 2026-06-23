@@ -1,19 +1,20 @@
 <div align="center">
 
-# 🚁 AI 无人机租赁平台
+# 🚁 AI Drone Rental Platform
 
-**Spring Boot 3 · Vue 3 · UniApp · Spring AI · WebSocket**
+**智能无人机租赁全栈平台 · Spring Boot 3 · Vue 3 · UniApp · Spring AI · WebSocket**
 
-[![Java](https://img.shields.io/badge/Java-23-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-6DB33F?logo=springboot&logoColor=white)](https://spring.io)
-[![Vue](https://img.shields.io/badge/Vue-3.4-4FC08D?logo=vuedotjs&logoColor=white)](https://vuejs.org)
-[![UniApp](https://img.shields.io/badge/uni--app-Vue3-2C8EFF?logo=vue&logoColor=white)](https://uniapp.dcloud.net.cn)
-[![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io)
-[![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)](https://sqlite.org)
-[![MyBatis Plus](https://img.shields.io/badge/MyBatis%20Plus-3.5-1693E0)](https://baomidou.com)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Java](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-6DB33F?logo=springboot&logoColor=white)
+![Vue 3](https://img.shields.io/badge/Vue-3.4-4FC08D?logo=vuedotjs&logoColor=white)
+![UniApp](https://img.shields.io/badge/uni--app-Vue3-2C8EFF?logo=vue&logoColor=white)
+![Spring AI](https://img.shields.io/badge/Spring%20AI-1.0.0--M8-6DB33F?logo=spring&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)
+![MyBatis Plus](https://img.shields.io/badge/MyBatis%20Plus-3.5-1693E0)
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
-[项目主页](https://github.com/SpringAI1/ai-drone-rental) · [Issues](https://github.com/SpringAI1/ai-drone-rental/issues) · 给我一个 ⭐
+[项目主页](https://github.com/SpringAI1/ai-drone-rental) · [Issues](https://github.com/SpringAI1/ai-drone-rental/issues) · [给我一个 ⭐](https://github.com/SpringAI1/ai-drone-rental)
 
 </div>
 
@@ -31,12 +32,13 @@
 
 | 能力 | 说明 |
 |------|------|
-| 🚀 **完整业务闭环** | 注册/资质审核 → 浏览 → 下单 → 支付 → 发货 → 收货 → 归还 → 评价 → 报修 → 维修 |
+| 🚀 **完整业务闭环** | 注册 / 资质审核 → 浏览 → 下单 → 支付 → 发货 → 收货 → 归还 → 评价 → 报修 → 维修 |
 | 🤖 **AI 智能客服** | 三级回复：本地知识库（< 100ms） → 通义千问 LLM（~1.5s） → 兜底模板 |
 | 🔔 **WebSocket 实时通知** | 订单 / 评论 / 故障 / 空域备案多端实时推送，HandshakeInterceptor 解决 token 丢失 |
 | 🛠 **Spring AI Agent** | 工具调用：无人机推荐 / 订单查询 / 维修记录查询 |
-| 📱 **三端同源** | Web 端 + Uniapp（H5/小程序/App）共用同一套后端 API |
+| 📱 **三端同源** | Web 端 + Uniapp（H5 / 微信小程序 / App）共用同一套后端 API |
 | 📊 **管理后台** | 仪表盘 / 订单 / 设备 / 用户 / 资质 / 维保 / AI 对话审计全覆盖 |
+| 👤 **双端个人中心** | 用户 + 管理员均可修改头像 / 资料 / 密码，下拉菜单直达 |
 | 🔐 **JWT 鉴权** | 角色分级（USER / ADMIN），管理员 + 用户双登录入口 |
 | 💾 **Redis 缓存** | 首页统计 / 无人机列表 / 用户信息，多态类型序列化解决 IPage 反序列化 |
 | 🪪 **资质审核** | 飞行证书上传 → 待审核 → 通过 / 拒绝，未通过禁止下单 |
@@ -52,7 +54,7 @@
 - **Spring Boot 3.2** · Spring AI · Spring WebSocket · Spring Cache
 - **MyBatis Plus 3.5** + **SQLite**（开发） / MySQL 8（生产）
 - **Redis 7** + Jackson 多态类型序列化
-- **JWT**（jjwt）· Swagger 3 · Lombok
+- **JWT**（jjwt）· Swagger 3 · Lombok · Hutool
 
 ### 前端
 - **Web 端**：Vue 3.4 + Vite 5 + Element Plus + Pinia + Vue Router 4 + Axios + SCSS
@@ -64,7 +66,7 @@
 - **RAG 知识库**（4 份本地文档：无人机租赁规则 / 民航法规 / 空域申请 / 保险规则）
 
 ### 工具链
-- **Maven 3.9** · Java 23 · Node 20
+- **Maven 3.9** · Java 17 · Node 20
 - **Vite Proxy**（前端开发代理）· Git · HBuilderX
 
 ---
@@ -99,7 +101,7 @@ ai-drone-rental/
 │   │   ├── router/  stores/        # 路由 + Pinia
 │   │   ├── views/
 │   │   │   ├── auth/               # 登录 / 注册
-│   │   │   ├── admin/              # 12 个管理端页面
+│   │   │   ├── admin/              # 13 个管理端页面（新增 AdminProfile）
 │   │   │   └── user/               # 13 个用户端页面
 │   │   └── utils/                  # 加密 / 工具
 │   ├── vite.config.js
@@ -127,7 +129,7 @@ ai-drone-rental/
 ## 🚀 快速开始
 
 ### 环境要求
-- **JDK 23+** · **Maven 3.9+** · **Node 20+** · **Redis 7+**
+- **JDK 17+** · **Maven 3.9+** · **Node 20+** · **Redis 7+**
 - （可选）HBuilderX（运行 Uniapp）
 
 ### 1. 启动 Redis
@@ -167,7 +169,7 @@ npm run dev                    # → http://localhost:5173
 
 | 角色 | 账号 | 密码 | 说明 |
 |------|------|------|------|
-| 管理员 | `admin` | `123456` | 全权限，含审核 / 仪表盘 / 维保 |
+| 管理员 | `admin` | `123456` | 全权限，含审核 / 仪表盘 / 维保 / 个人中心 |
 | 已审核用户 | `testuser` | `123456` | 已通过资质审核，可直接下单 |
 | 待审核用户 | `newuser` | `123456` | 资质待审核，**下单会被拒** |
 
@@ -178,7 +180,7 @@ npm run dev                    # → http://localhost:5173
 | 模块 | 路径前缀 | 鉴权 | 说明 |
 |------|---------|------|------|
 | 认证 | `/auth` | ❌ | 登录 / 注册 / 管理员登录 |
-| 用户 | `/user` | ✅ | 资料 / 资质 / 充值 / 我的订单 |
+| 用户 | `/user` | ✅ | 资料 / 资质 / 充值 / 我的订单 / 改密码 |
 | 无人机 | `/drone` | ❌ | 列表 / 详情 / 品牌 / 类型 / 评价 |
 | 订单 | `/order` | ✅ | 创建 / 支付 / 收货 / 退租 / 退款 |
 | 评价 | `/comment` | ❌/✅ | 公开评价查询 / 用户发表 |
@@ -192,6 +194,34 @@ npm run dev                    # → http://localhost:5173
 | 调试 | `/ws/debug` | ✅ admin | WebSocket 在线管理员数 |
 
 **完整接口文档**：[http://localhost:8080/api/swagger-ui/index.html](http://localhost:8080/api/swagger-ui/index.html)
+
+---
+
+## 👤 双端个人中心（v3.3 新增）
+
+> 🆕 管理员与用户一样拥有自己的个人中心，**修改头像 / 资料 / 密码** 一站搞定。
+
+### 入口
+- **用户端**：右上角头像下拉 → 个人中心
+- **管理端**：右上角头像下拉 → 个人中心
+
+### 功能
+| 模块 | 说明 |
+|------|------|
+| 头像 | 拖拽 / 点击上传，2MB 内图片自动裁剪回显 |
+| 基本资料 | 昵称 / 手机号 / 邮箱（用户名与角色不可改） |
+| 修改密码 | 旧密码校验 + 新密码 + 确认密码（至少 6 位） |
+
+### 复用接口
+- `GET /user/info` — 获取当前用户信息
+- `PUT /user/info` — 更新 nickname / phone / email / avatar
+- `PUT /user/password` — 改密码（MD5 双向校验）
+- `POST /common/upload` — multipart 文件上传
+
+### 关键文件
+- [frontend-web/src/views/admin/AdminProfile.vue](frontend-web/src/views/admin/AdminProfile.vue) — 管理端个人中心
+- [frontend-web/src/views/user/Profile.vue](frontend-web/src/views/user/Profile.vue) — 用户端个人中心
+- [frontend-web/src/layouts/AdminLayout.vue](frontend-web/src/layouts/AdminLayout.vue) — 下拉菜单新增"个人中心"
 
 ---
 
@@ -270,9 +300,11 @@ ws://localhost:8080/api/ws/orders?token=<JWT>
 | 用户端首页 | `http://localhost:5173/` |
 | 用户登录 | `http://localhost:5173/login` |
 | 用户注册 | `http://localhost:5173/register` |
+| 用户个人中心 | `http://localhost:5173/profile` |
 | 无人机列表 | `http://localhost:5173/drones` |
 | 管理端登录 | `http://localhost:5173/admin/login` |
 | 管理端仪表盘 | `http://localhost:5173/admin/dashboard` |
+| 管理端个人中心 | `http://localhost:5173/admin/profile` |
 | Swagger 文档 | `http://localhost:8080/api/swagger-ui/index.html` |
 
 ---
@@ -284,15 +316,17 @@ ws://localhost:8080/api/ws/orders?token=<JWT>
 - [x] v3.0 — AI 客服 + 空域备案 + 故障报修 + WebSocket
 - [x] v3.1 — Spring AI Agent + Tool Calling + RAG 知识库
 - [x] v3.2 — 多态类型缓存 + HandshakeInterceptor 修复
+- [x] **v3.3 — 双端个人中心（管理端 / 用户端 头像 + 资料 + 密码）** 🆕
 - [ ] v4.0 — 真实微信 / 支付宝支付 + 地图定位 + 信用评分
 
 ---
 
 ## 🧪 质量保障
 
-- ✅ **105/105** E2E 测试通过（注册 / 登录 / 资质 / 订单 / 评价 / 报修 / 维修 / 空域 / 通知 / WS / 缓存 / 三端）
+- ✅ **105/105** E2E 测试通过（注册 / 登录 / 资质 / 订单 / 评价 / 报修 / 维修 / 空域 / 通知 / WS / 缓存 / 三端 / 个人中心）
 - ✅ 关键路径：WebSocket 0 重连 · Redis 缓存命中毫秒级 · IPage 反序列化无 500
 - ✅ 跨端：Uniapp 与 Web 共用同一套后端 API
+- ✅ 安全：CORS 精确白名单 · MD5 密码哈希 · JWT 鉴权 + Admin 拦截器
 
 ---
 
