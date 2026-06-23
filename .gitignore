@@ -82,6 +82,8 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+# 保留 .env.example 作为模板
+!.env.example
 
 # =========================================
 # 编辑临时文件

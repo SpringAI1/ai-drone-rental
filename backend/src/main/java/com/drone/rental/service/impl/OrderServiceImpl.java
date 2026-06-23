@@ -1,6 +1,5 @@
 package com.drone.rental.service.impl;
 
-import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -9,19 +8,17 @@ import com.drone.rental.common.Constants;
 import com.drone.rental.common.ResultCode;
 import com.drone.rental.common.exception.BusinessException;
 import com.drone.rental.dto.OrderCreateDTO;
-import com.drone.rental.entity.Comment;
 import com.drone.rental.entity.Drone;
 import com.drone.rental.entity.Payment;
 import com.drone.rental.entity.RentalOrder;
-import com.drone.rental.entity.AirspaceRecord;
 import com.drone.rental.entity.User;
-import com.drone.rental.mapper.CommentMapper;
 import com.drone.rental.mapper.RentalOrderMapper;
 import com.drone.rental.security.UserContext;
 import com.drone.rental.service.*;
+import com.drone.rental.service.support.OrderConverter;
+import com.drone.rental.service.support.OrderNotifier;
+import com.drone.rental.service.support.OrderNumberGenerator;
 import com.drone.rental.vo.OrderVO;
-import com.drone.rental.websocket.OrderNotificationHandler;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -31,11 +28,14 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
- * 订单服务实现类
+ * 订单服务实现
  */
 @Service
 public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder> implements OrderService {
@@ -57,46 +57,38 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
     private UserQualificationService qualificationService;
 
     @Autowired
-    private CommentMapper commentMapper;
+    private OrderConverter orderConverter;
 
     @Autowired
-    private NotificationService notificationService;
+    private OrderNumberGenerator orderNumberGenerator;
 
-    // WebSocket 实时通知（可选，不影响订单创建）
     @Autowired
-    private OrderNotificationHandler orderNotificationHandler;
+    private OrderNotifier orderNotifier;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public OrderVO createOrder(OrderCreateDTO dto) {
         Long userId = UserContext.getCurrentUserId();
 
-        // 1. 检查用户状态
+        // 1. 校验用户状态 / 资质 / 机型可租 / 空域备案
         userService.checkUserOperable(userId);
-
-        // 2. 检查用户资质
         qualificationService.checkQualificationValid(userId);
-
-        // 3. 检查无人机是否可租赁
         droneService.checkDroneRentable(dto.getDroneId());
-
-        // 4. 检查空域备案（如果提供了空域备案ID）
         if (dto.getAirspaceRecordId() != null) {
             airspaceRecordService.checkAirspaceRecordValid(dto.getAirspaceRecordId(), userId);
         }
 
-        // 5. 计算租赁天数和金额
+        // 2. 计算租期 / 金额
         Drone drone = droneService.getById(dto.getDroneId());
         long days = ChronoUnit.DAYS.between(dto.getStartDate(), dto.getEndDate()) + 1;
         if (days <= 0) {
             throw new BusinessException("租赁结束日期必须大于等于开始日期");
         }
-
         BigDecimal totalAmount = drone.getPricePerDay().multiply(BigDecimal.valueOf(days));
 
-        // 6. 创建订单
+        // 3. 落库
         RentalOrder order = new RentalOrder();
-        order.setOrderNo(generateOrderNo());
+        order.setOrderNo(orderNumberGenerator.generate());
         order.setUserId(userId);
         order.setDroneId(dto.getDroneId());
         order.setAirspaceRecordId(dto.getAirspaceRecordId());
@@ -105,65 +97,22 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         order.setRentalDays((int) days);
         order.setUnitPrice(drone.getPricePerDay());
         order.setTotalAmount(totalAmount);
-        order.setDepositAmount(BigDecimal.ZERO); // 暂不收押金
+        order.setDepositAmount(BigDecimal.ZERO);
         order.setOrderStatus(Constants.ORDER_STATUS_UNPAID);
-        // 保存收货地址（用户手动填写或默认地址，非空时存）
         if (dto.getDeliveryAddress() != null && !dto.getDeliveryAddress().trim().isEmpty()) {
             order.setDeliveryAddress(dto.getDeliveryAddress().trim());
         }
         order.setRemark(dto.getRemark());
-
         this.save(order);
 
-        // 发送通知给用户（不影响主流程，失败不会回滚）
-        try {
-            String userTitle = "订单创建成功";
-            String userContent = "您已成功下单「" + (drone.getModel() != null ? drone.getModel() : "无人机") +
-                    "」，订单号 " + order.getOrderNo() + "，订单金额 ¥" + totalAmount +
-                    "，请尽快完成支付。";
-            notificationService.sendNotification(userId, 1, userTitle, userContent, order.getId());
-        } catch (Exception e) {
-            // 通知失败不影响订单创建
-        }
+        // 4. 通知（失败不影响主流程）
+        orderNotifier.sendCreateNotifications(order, drone, totalAmount);
 
-        // 发送通知给管理员（userId=null 表示全局通知）
-        try {
-            User user = userService.getById(userId);
-            String adminTitle = "新订单待处理";
-            String userName = user != null && user.getUsername() != null ? user.getUsername() : "用户";
-            String adminContent = "「" + userName + "」下单了「" +
-                    (drone.getModel() != null ? drone.getModel() : "无人机") +
-                    "」，订单号 " + order.getOrderNo() + "，金额 ¥" + totalAmount + "，请及时处理。";
-            // 把 userId 设为 -1 表示管理员通知
-            notificationService.sendNotification(-1L, 1, adminTitle, adminContent, order.getId());
-
-            // 广播到所有在线的管理员（WebSocket 实时通知）
-            try {
-                java.util.Map<String, Object> wsPayload = new java.util.HashMap<>();
-                wsPayload.put("type", "new_order");
-                wsPayload.put("orderId", order.getId());
-                wsPayload.put("orderNo", order.getOrderNo());
-                wsPayload.put("totalAmount", totalAmount.toString());
-                wsPayload.put("droneModel", drone.getModel() != null ? drone.getModel() : "无人机");
-                wsPayload.put("userName", userName);
-                wsPayload.put("title", adminTitle);
-                wsPayload.put("content", adminContent);
-                wsPayload.put("createdAt", java.time.LocalDateTime.now().toString());
-                orderNotificationHandler.broadcast(wsPayload);
-            } catch (Exception e) {
-                // WS 广播失败不影响订单创建
-            }
-        } catch (Exception e) {
-            // 通知失败不影响订单创建
-        }
-
-        // 7. 减少库存
+        // 5. 扣库存 + 创建支付记录
         droneService.decreaseStock(dto.getDroneId(), 1, order.getId());
-
-        // 8. 创建支付记录
         paymentService.createPayment(order);
 
-        return convertToVO(order);
+        return orderConverter.convertToVO(order);
     }
 
     @Override
@@ -172,14 +121,11 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_EXIST);
         }
-
         // 普通用户只能查看自己的订单
-        Long currentUserId = UserContext.getCurrentUserId();
-        if (!UserContext.isAdmin() && !order.getUserId().equals(currentUserId)) {
+        if (!UserContext.isAdmin() && !order.getUserId().equals(UserContext.getCurrentUserId())) {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
-
-        return convertToVO(order);
+        return orderConverter.convertToVO(order);
     }
 
     @Override
@@ -187,40 +133,35 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         Long userId = UserContext.getCurrentUserId();
         Page<RentalOrder> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<RentalOrder> wrapper = new LambdaQueryWrapper<>();
-
         wrapper.eq(RentalOrder::getUserId, userId);
         if (orderStatus != null) {
             wrapper.eq(RentalOrder::getOrderStatus, orderStatus);
         }
         wrapper.orderByDesc(RentalOrder::getCreatedTime);
-
         IPage<RentalOrder> orderPage = this.page(page, wrapper);
-        return orderPage.convert(this::convertToVO);
+        return orderPage.convert(orderConverter::convertToVO);
     }
 
     @Override
     public IPage<OrderVO> pageOrders(Integer pageNum, Integer pageSize, String orderNo,
-                                      String userPhone, Integer orderStatus, String startDate, String endDate) {
+                                     String userPhone, Integer orderStatus, String startDate, String endDate) {
         Page<RentalOrder> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<RentalOrder> wrapper = new LambdaQueryWrapper<>();
-
         if (StringUtils.hasText(orderNo)) {
             wrapper.like(RentalOrder::getOrderNo, orderNo);
         }
         if (orderStatus != null) {
             wrapper.eq(RentalOrder::getOrderStatus, orderStatus);
         }
-        // 如果有用户手机号筛选，先查询用户ID
         if (StringUtils.hasText(userPhone)) {
             List<Long> userIds = userService.list(
-                new LambdaQueryWrapper<User>().like(User::getPhone, userPhone)
-            ).stream().map(User::getId).collect(java.util.stream.Collectors.toList());
+                    new LambdaQueryWrapper<User>().like(User::getPhone, userPhone)
+            ).stream().map(User::getId).collect(Collectors.toList());
             if (userIds.isEmpty()) {
                 return new Page<>(pageNum, pageSize);
             }
             wrapper.in(RentalOrder::getUserId, userIds);
         }
-        // 日期范围筛选
         if (StringUtils.hasText(startDate)) {
             wrapper.ge(RentalOrder::getCreatedTime, startDate + " 00:00:00");
         }
@@ -230,7 +171,7 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         wrapper.orderByDesc(RentalOrder::getCreatedTime);
 
         IPage<RentalOrder> orderPage = this.page(page, wrapper);
-        return orderPage.convert(this::convertToVO);
+        return orderPage.convert(orderConverter::convertToVO);
     }
 
     @Override
@@ -240,40 +181,27 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_EXIST);
         }
-
-        // 检查是否是自己的订单
-        Long currentUserId = UserContext.getCurrentUserId();
-        if (!order.getUserId().equals(currentUserId)) {
+        if (!order.getUserId().equals(UserContext.getCurrentUserId())) {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
-
         if (order.getOrderStatus() != Constants.ORDER_STATUS_UNPAID) {
             throw new BusinessException(ResultCode.ORDER_ALREADY_PAID);
         }
-
-        // 保存收货地址
         if (deliveryAddress != null && !deliveryAddress.trim().isEmpty()) {
             order.setDeliveryAddress(deliveryAddress.trim());
         }
-
-        // 保存支付方式
         if (paymentMethod != null) {
             order.setPaymentMethod(paymentMethod);
         }
-
-        // 更新订单状态
         order.setOrderStatus(Constants.ORDER_STATUS_PAID);
         order.setPayTime(LocalDateTime.now());
         this.updateById(order);
 
-        // 检查支付记录是否存在，不存在则创建
+        // 支付记录幂等创建
         Payment existingPayment = paymentService.getByOrderId(orderId);
         if (existingPayment == null) {
-            // 创建支付记录
             paymentService.createPayment(order);
         }
-
-        // 更新支付状态
         paymentService.updatePaymentStatus(orderId, Constants.PAYMENT_STATUS_PAID);
     }
 
@@ -284,14 +212,10 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_EXIST);
         }
-
-        // 检查是否是自己的订单
-        Long currentUserId = UserContext.getCurrentUserId();
-        if (!UserContext.isAdmin() && !order.getUserId().equals(currentUserId)) {
+        if (!UserContext.isAdmin() && !order.getUserId().equals(UserContext.getCurrentUserId())) {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
 
-        // 允许取消的状态：待支付(0) / 已支付(1) / 已发货(2)
         Integer status = order.getOrderStatus();
         boolean canCancel = Objects.equals(status, Constants.ORDER_STATUS_UNPAID)
                 || Objects.equals(status, Constants.ORDER_STATUS_PAID)
@@ -299,21 +223,18 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (!canCancel) {
             throw new BusinessException(ResultCode.ORDER_CANNOT_CANCEL);
         }
-
-        // 如果订单已支付，进行退款：余额退还给用户
+        // 已支付/已发货的订单取消时退还余额
         if (Objects.equals(status, Constants.ORDER_STATUS_PAID)
                 || Objects.equals(status, Constants.ORDER_STATUS_SHIPPED)) {
             if (order.getTotalAmount() != null && order.getTotalAmount().compareTo(BigDecimal.ZERO) > 0) {
                 userService.increaseBalance(order.getUserId(), order.getTotalAmount());
             }
         }
-
         order.setOrderStatus(Constants.ORDER_STATUS_CANCELLED);
         order.setCancelReason(reason);
         order.setCancelTime(LocalDateTime.now());
         this.updateById(order);
 
-        // 恢复库存
         droneService.increaseStock(order.getDroneId(), 1, orderId);
     }
 
@@ -324,17 +245,12 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_EXIST);
         }
-
-        // 只有租赁中的订单可以确认归还
         if (order.getOrderStatus() != Constants.ORDER_STATUS_RENTING) {
             throw new BusinessException("订单状态不允许确认归还，只有租赁中的订单才能确认归还");
         }
-
         order.setOrderStatus(Constants.ORDER_STATUS_RETURNED);
         order.setReturnTime(LocalDateTime.now());
         this.updateById(order);
-
-        // 恢复库存
         droneService.increaseStock(order.getDroneId(), 1, orderId);
     }
 
@@ -345,21 +261,14 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_EXIST);
         }
-
-        // 只有已支付的订单可以退款
         if (order.getOrderStatus() != Constants.ORDER_STATUS_PAID) {
             throw new BusinessException("订单状态不允许退款");
         }
-
         order.setOrderStatus(Constants.ORDER_STATUS_REFUNDED);
         order.setCancelReason(reason);
         order.setCancelTime(LocalDateTime.now());
         this.updateById(order);
-
-        // 更新支付状态为已退款
         paymentService.refundPayment(orderId, reason);
-
-        // 恢复库存
         droneService.increaseStock(order.getDroneId(), 1, orderId);
     }
 
@@ -370,13 +279,9 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_EXIST);
         }
-
-        // 只有已支付的订单可以发货
         if (order.getOrderStatus() != Constants.ORDER_STATUS_PAID) {
             throw new BusinessException("订单状态不允许发货，只有已支付的订单才能发货");
         }
-
-        // 更新订单状态为待收货
         order.setOrderStatus(Constants.ORDER_STATUS_SHIPPED);
         order.setRemark("快递公司: " + expressCompany + ", 快递单号: " + expressNo);
         order.setShipTime(LocalDateTime.now());
@@ -390,19 +295,12 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_EXIST);
         }
-
-        // 检查是否是自己的订单
-        Long currentUserId = UserContext.getCurrentUserId();
-        if (!order.getUserId().equals(currentUserId)) {
+        if (!order.getUserId().equals(UserContext.getCurrentUserId())) {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
-
-        // 只有待收货的订单可以确认收货
         if (order.getOrderStatus() != Constants.ORDER_STATUS_SHIPPED) {
             throw new BusinessException("订单状态不允许确认收货");
         }
-
-        // 更新订单状态为租赁中
         order.setOrderStatus(Constants.ORDER_STATUS_RENTING);
         order.setReceiveTime(LocalDateTime.now());
         this.updateById(order);
@@ -415,20 +313,13 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_EXIST);
         }
-
-        // 检查是否是自己的订单
-        Long currentUserId = UserContext.getCurrentUserId();
-        if (!order.getUserId().equals(currentUserId)) {
+        if (!order.getUserId().equals(UserContext.getCurrentUserId())) {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
-
-        // 只有租赁中的订单可以申请退租
         if (order.getOrderStatus() != Constants.ORDER_STATUS_RENTING) {
             throw new BusinessException("订单状态不允许申请退租");
         }
-
-        // 这里可以发送通知给管理员，暂时只记录日志
-        // 用户申请退租后，管理员在后台确认归还
+        // 这里可以发通知给管理员，目前先保留 hook
     }
 
     @Override
@@ -438,13 +329,10 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_EXIST);
         }
-
         Integer currentStatus = order.getOrderStatus();
-
         if (status.equals(currentStatus)) {
             return;
         }
-
         switch (status) {
             case Constants.ORDER_STATUS_PAID:
                 if (currentStatus != Constants.ORDER_STATUS_UNPAID) {
@@ -483,58 +371,14 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
             default:
                 throw new BusinessException("无效的订单状态值");
         }
-
         order.setOrderStatus(status);
         this.updateById(order);
     }
 
-    /**
-     * 生成订单号
-     */
-    private String generateOrderNo() {
-        return "ORD" + System.currentTimeMillis() + IdUtil.fastSimpleUUID().substring(0, 6).toUpperCase();
-    }
-
-    /**
-     * 转换为VO
-     */
-    private OrderVO convertToVO(RentalOrder order) {
-        OrderVO vo = new OrderVO();
-        BeanUtils.copyProperties(order, vo);
-
-        // 获取用户信息
-        User user = userService.getById(order.getUserId());
-        if (user != null) {
-            vo.setUsername(user.getNickname() != null ? user.getNickname() : user.getUsername());
-        }
-
-        // 获取无人机信息
-        Drone drone = droneService.getById(order.getDroneId());
-        if (drone != null) {
-            vo.setDroneModel(drone.getModel());
-            vo.setDroneImage(drone.getImage());
-        }
-
-        // 获取空域备案信息
-        AirspaceRecord record = airspaceRecordService.getById(order.getAirspaceRecordId());
-        if (record != null) {
-            vo.setRegionName(record.getRegionName());
-        }
-
-        // 检查是否已评论
-        Long commentCount = commentMapper.selectCount(new LambdaQueryWrapper<Comment>()
-                .eq(Comment::getOrderId, order.getId())
-                .eq(Comment::getDeleted, 0));
-        vo.setHasComment(commentCount > 0);
-
-        return vo;
-    }
-
     @Override
-    public java.util.Map<String, Object> getCurrentUserOrderStats() {
+    public Map<String, Object> getCurrentUserOrderStats() {
         Long userId = UserContext.getCurrentUserId();
-        java.util.Map<String, Object> stats = new java.util.HashMap<>();
-
+        Map<String, Object> stats = new HashMap<>();
         LambdaQueryWrapper<RentalOrder> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(RentalOrder::getUserId, userId);
 
@@ -543,8 +387,9 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         stats.put("pendingReceive", this.count(wrapper.clone().eq(RentalOrder::getOrderStatus, Constants.ORDER_STATUS_SHIPPED)));
         stats.put("renting", this.count(wrapper.clone().eq(RentalOrder::getOrderStatus, Constants.ORDER_STATUS_RENTING)));
         stats.put("returned", this.count(wrapper.clone().eq(RentalOrder::getOrderStatus, Constants.ORDER_STATUS_RETURNED)));
-        stats.put("canceled", this.count(wrapper.clone().eq(RentalOrder::getOrderStatus, Constants.ORDER_STATUS_CANCELLED)) + this.count(wrapper.clone().eq(RentalOrder::getOrderStatus, Constants.ORDER_STATUS_REFUNDED)));
-
+        stats.put("canceled",
+                this.count(wrapper.clone().eq(RentalOrder::getOrderStatus, Constants.ORDER_STATUS_CANCELLED))
+                        + this.count(wrapper.clone().eq(RentalOrder::getOrderStatus, Constants.ORDER_STATUS_REFUNDED)));
         return stats;
     }
 
@@ -555,22 +400,17 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_EXIST);
         }
-
-        Long currentUserId = UserContext.getCurrentUserId();
-        if (!order.getUserId().equals(currentUserId)) {
+        if (!order.getUserId().equals(UserContext.getCurrentUserId())) {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
-
-        if (order.getOrderStatus() != Constants.ORDER_STATUS_PAID && 
-            order.getOrderStatus() != Constants.ORDER_STATUS_SHIPPED) {
+        if (order.getOrderStatus() != Constants.ORDER_STATUS_PAID
+                && order.getOrderStatus() != Constants.ORDER_STATUS_SHIPPED) {
             throw new BusinessException("只有已支付或已发货的订单可以申请退款");
         }
-
         order.setOrderStatus(Constants.ORDER_STATUS_REFUNDED);
         order.setCancelReason(reason);
         order.setCancelTime(LocalDateTime.now());
         this.updateById(order);
-
         paymentService.refundPayment(orderId, reason);
         droneService.increaseStock(order.getDroneId(), 1, orderId);
     }

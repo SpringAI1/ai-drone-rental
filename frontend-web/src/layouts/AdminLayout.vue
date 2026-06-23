@@ -219,13 +219,12 @@ const connectOrderWebSocket = () => {
     orderWs = new WebSocket(wsUrl)
 
     orderWs.onopen = () => {
-      console.log('[WS] 实时订单通知已连接')
+      // WS 连接成功（保留钩子用于未来扩展）
     }
 
     orderWs.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data)
-        console.log('[WS] 收到消息', msg)
 
         // 系统控制消息（连接成功/心跳）不弹提示也不计数
         if (!msg || msg.type === 'connected' || msg.type === 'pong') return

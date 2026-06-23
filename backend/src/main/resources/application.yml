@@ -61,8 +61,10 @@ spring:
 
   ai:
     openai:
-      api-key: sk-your-dashscope-api-key-here
-      base-url: https://dashscope.aliyuncs.com/compatible-mode
+      # API Key 从环境变量读取，避免泄露到代码仓库
+      # 设置方式：export DASHSCOPE_API_KEY=sk-xxx
+      api-key: ${DASHSCOPE_API_KEY:sk-your-dashscope-api-key-here}
+      base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
       chat:
         options:
           model: qwen-plus
@@ -91,8 +93,13 @@ spring:
         version: 1.0.0
         type: SYNC
         sse-endpoint: /mcp/sse
-        # 允许所有来源（生产环境应该限制）
-        allowed-origins: "*"
+        # 允许的 MCP 客户端来源（生产环境应该精确到白名单，多个用逗号分隔）
+        # 留 "*" 仅用于本地开发；生产建议设置为实际域名
+        allowed-origins: ${MCP_ALLOWED_ORIGINS:*}
+
+# CORS 跨域白名单（生产环境从环境变量配置）
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://localhost:8080}
 
 mybatis-plus:
   type-aliases-package: com.drone.rental.entity
@@ -107,7 +114,10 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 
 jwt:
-  secret: your-jwt-secret-here
+  # JWT secret 从环境变量读取，避免硬编码到代码仓库
+  # 设置方式：export JWT_SECRET=your-strong-secret-key-at-least-32-bytes
+  # 留默认值仅用于本地开发，生产环境必须设置环境变量覆盖
+  secret: ${JWT_SECRET:your-jwt-secret-here}
   expiration: 86400000
   header: Authorization
   prefix: Bearer

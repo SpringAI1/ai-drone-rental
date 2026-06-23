@@ -1,16 +1,8 @@
 <script setup lang="ts">
-import { onLaunch, onAppShow, onAppHide } from '@dcloudio/uni-app'
+import { onLaunch } from '@dcloudio/uni-app'
 
 	onLaunch(() => {
-		console.log('无人机租赁系统启动')
-	})
-
-	onAppShow(() => {
-		console.log('App Show')
-	})
-
-	onAppHide(() => {
-		console.log('App Hide')
+		// 应用启动钩子（保留用于未来扩展）
 	})
 </script>
 
