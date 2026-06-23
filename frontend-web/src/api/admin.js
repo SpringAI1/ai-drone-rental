@@ -99,3 +99,8 @@ export const getRecentOrders = (limit = 5) => {
 export const getTodoItems = () => {
   return get('/admin/dashboard/todos')
 }
+
+// 获取订单详情
+export const getOrderDetail = (id) => {
+  return get(`/admin/order/${id}`)
+}

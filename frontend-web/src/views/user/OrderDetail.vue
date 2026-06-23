@@ -127,12 +127,13 @@
 
             <!-- 待发货 (status=1) -->
             <template v-else-if="order.orderStatus === 1">
-              <el-button disabled size="large">等待商家发货</el-button>
+              <el-button size="large" @click="handleCancel">取消订单</el-button>
             </template>
 
             <!-- 待收货 (status=2) -->
             <template v-else-if="order.orderStatus === 2">
               <el-button type="primary" size="large" @click="handleReceive">确认收货</el-button>
+              <el-button size="large" @click="handleCancel">取消订单</el-button>
             </template>
 
             <!-- 租赁中 (status=3) -->
@@ -364,10 +365,12 @@ const formatDate = (dateTime) => {
   return dateTime.substring(0, 10)
 }
 
-// 获取图片完整URL
 const getImageUrl = (url) => {
   if (!url) return ''
   if (url.startsWith('http')) return url
+  if (url.startsWith('/api/uploads/')) return url
+  if (url.startsWith('/uploads/')) return `/api${url}`
+  if (!url.startsWith('/')) return `/api/uploads/${url}`
   return `/api${url}`
 }
 

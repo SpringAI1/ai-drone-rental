@@ -4,6 +4,7 @@ import com.drone.rental.common.Result;
 import com.drone.rental.common.ResultCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -15,8 +16,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -122,6 +126,37 @@ public class GlobalExceptionHandler {
         String message = "资源不存在: " + e.getRequestURL();
         log.warn(message);
         return Result.error(ResultCode.NOT_FOUND.getCode(), message);
+    }
+
+    /**
+     * 处理文件不存在异常（静态资源访问如/upload/**）
+     */
+    @ExceptionHandler({FileNotFoundException.class, java.nio.file.NoSuchFileException.class})
+    public ResponseEntity<Void> handleFileNotFoundException(Exception e, HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri.contains("/uploads/") || uri.endsWith(".png") || uri.endsWith(".jpg") ||
+            uri.endsWith(".jpeg") || uri.endsWith(".gif") || uri.endsWith(".ico") ||
+            uri.endsWith(".webp") || uri.endsWith(".svg") || uri.endsWith(".css") ||
+            uri.endsWith(".js")) {
+            log.debug("静态资源不存在: {}", uri);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        log.warn("文件不存在: {}", uri);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
+
+    /**
+     * 处理静态资源相关的IO异常
+     */
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<Void> handleIOException(IOException e, HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri.contains("/uploads/") || uri.endsWith(".png") || uri.endsWith(".jpg")) {
+            log.debug("静态资源IO异常: {}, message: {}", uri, e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        log.error("IO异常: ", e);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
     /**

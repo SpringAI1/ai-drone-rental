@@ -8,11 +8,10 @@ import com.drone.rental.service.AiConfigService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 @Service
 public class AiConfigServiceImpl extends ServiceImpl<AiConfigMapper, AiConfig> implements AiConfigService {
 
@@ -123,7 +122,6 @@ public class AiConfigServiceImpl extends ServiceImpl<AiConfigMapper, AiConfig> i
     }
 
     @Override
-    @CacheEvict(value = "aiStatus", allEntries = true)
     public void setAiStatus(boolean enabled) {
         AiConfig config = getByKey(AI_STATUS_KEY);
         if (config == null) {
@@ -136,7 +134,6 @@ public class AiConfigServiceImpl extends ServiceImpl<AiConfigMapper, AiConfig> i
     }
 
     @Override
-    @Cacheable(value = "aiStatus", key = "'ai_maintenance_message'", unless = "#result == null")
     public String getAiMaintenanceMessage() {
         AiConfig config = getByKey(AI_MAINTENANCE_MESSAGE_KEY);
         if (config == null) {

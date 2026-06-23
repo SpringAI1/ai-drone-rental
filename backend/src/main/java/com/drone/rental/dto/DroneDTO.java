@@ -1,5 +1,6 @@
 package com.drone.rental.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -13,6 +14,7 @@ import java.math.BigDecimal;
  * 无人机创建/更新DTO
  */
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Schema(description = "无人机参数")
 public class DroneDTO {
 
@@ -33,7 +35,7 @@ public class DroneDTO {
     private String image;
 
     @NotNull(message = "每日租赁价格不能为空")
-    @DecimalMin(value = "0.01", message = "价格必须大于0")
+    @DecimalMin(value = "0", message = "价格不能为负数")
     @Schema(description = "每日租赁价格(元)")
     private BigDecimal pricePerDay;
 

@@ -72,8 +72,12 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Not
             return;
         }
 
+        // 管理员登录时，"全部已读"作用于发给管理员的通知（userId = -1）
+        // 普通用户登录时，作用于自己的通知
+        Long targetUserId = UserContext.isAdmin() ? -1L : userId;
+
         this.update(new LambdaUpdateWrapper<Notification>()
-                .eq(Notification::getUserId, userId)
+                .eq(Notification::getUserId, targetUserId)
                 .eq(Notification::getReadStatus, 0)
                 .eq(Notification::getDeleted, 0)
                 .set(Notification::getReadStatus, 1));
@@ -119,5 +123,12 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Not
                 .eq(Notification::getReadStatus, 0)
                 .eq(Notification::getDeleted, 0)
                 .set(Notification::getReadStatus, 1));
+    }
+
+    @Override
+    public void adminClearAll() {
+        // 物理删除管理员收到的所有通知（绕过逻辑删除）
+        this.baseMapper.delete(new LambdaQueryWrapper<Notification>()
+                .eq(Notification::getUserId, -1));
     }
 }

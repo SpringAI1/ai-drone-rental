@@ -2,6 +2,7 @@ import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
+import { encryptRequest, decryptResponse, ENCRYPTION_ENABLED } from '@/utils/encryption'
 
 const service = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -17,8 +18,33 @@ const getRequestKey = (config) => {
   return `${config.method || 'get'}:${config.url}:${JSON.stringify(config.params)}:${JSON.stringify(config.data)}`
 }
 
+// 判断是否需要加密：排除公开接口、GET 查询参数、文件上传
+function shouldEncrypt(config) {
+  if (!ENCRYPTION_ENABLED) return false
+  // GET 请求一般不需要（走 query params，不走 body）
+  if ((config.method || '').toLowerCase() === 'get') return false
+
+  const url = (config.url || '').trim()
+
+  // 公开接口（拿公钥本身等）跳过加密
+  if (url.startsWith('/public/')) return false
+  if (url.includes('/public/rsa-key')) return false
+
+  // 文件上传：multipart/form-data 不走 JSON 加密
+  if (url.includes('/common/upload')) return false
+  if (url.includes('/uploads/')) return false
+
+  // WebSocket 不走 HTTP 加密
+  if (url.startsWith('/ws/')) return false
+
+  // 有 data 才加密（空 body 的 POST/PUT 也跳过）
+  if (config.data === undefined || config.data === null || config.data === '') return false
+
+  return true
+}
+
 service.interceptors.request.use(
-  (config) => {
+  async (config) => {
     const authStore = useAuthStore()
     const requestKey = getRequestKey(config)
 
@@ -34,6 +60,25 @@ service.interceptors.request.use(
       config.headers['Authorization'] = `Bearer ${authStore.token}`
     }
 
+    // ========== RSA+AES 信封加密 ==========
+    if (shouldEncrypt(config)) {
+      try {
+        const originalData = typeof config.data === 'string'
+          ? config.data
+          : JSON.stringify(config.data || {})
+
+        const { encryptedKey, encryptedData } = await encryptRequest(originalData)
+
+        // 替换 body 为加密结构
+        config.data = { encryptedKey, encryptedData }
+        // 标记头：方便后端日志调试
+        config.headers['X-Encrypted'] = '1'
+      } catch (err) {
+        console.error('[encryption] 请求加密失败，降级为明文', err)
+        // 加密失败不阻断，降级为明文，保证业务可用
+      }
+    }
+
     return config
   },
   (error) => {
@@ -46,7 +91,18 @@ service.interceptors.response.use(
     const requestKey = getRequestKey(response.config)
     pendingRequests.delete(requestKey)
 
-    const res = response.data
+    let res = response.data
+
+    // ========== RSA+AES 信封解密 ==========
+    if (res && res.encrypted === true && res.data) {
+      try {
+        res = decryptResponse(res)
+      } catch (err) {
+        console.error('[encryption] 响应解密失败', err)
+        ElMessage.error('响应解密失败')
+        return Promise.reject(new Error('响应解密失败'))
+      }
+    }
 
     if (res.code === 200) {
       return res
@@ -116,7 +172,7 @@ const handleUnauthorized = () => {
   authStore.logout()
 
   ElMessageBox.confirm('登录状态已过期，请重新登录', '提示', {
-    confirmButtonText: '重新登录',
+    confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
   })

@@ -273,8 +273,11 @@ const defaultImage = 'https://picsum.photos/80/50'
 
 // 获取图片完整URL
 const getImageUrl = (url) => {
-  if (!url) return defaultImage
+  if (!url) return ''
   if (url.startsWith('http')) return url
+  if (url.startsWith('/api/uploads/')) return url
+  if (url.startsWith('/uploads/')) return `/api${url}`
+  if (!url.startsWith('/')) return `/api/uploads/${url}`
   return `/api${url}`
 }
 
@@ -375,7 +378,20 @@ const handleAdd = () => {
 const handleEdit = (row) => {
   isEdit.value = true
   currentDrone.value = row
-  Object.assign(form, row)
+  Object.assign(form, {
+    brand: row.brand || '',
+    model: row.model || '',
+    type: row.type || '',
+    status: row.status != null ? row.status : 1,
+    onShelf: row.onShelf != null ? row.onShelf : 1,
+    pricePerDay: row.pricePerDay != null ? Number(row.pricePerDay) : 0,
+    stock: row.stock != null ? Number(row.stock) : 0,
+    flightTime: row.flightTime != null ? Number(row.flightTime) : 0,
+    maxSpeed: row.maxSpeed != null ? Number(row.maxSpeed) : 0,
+    maxPayload: row.maxPayload != null ? Number(row.maxPayload) : 0,
+    description: row.description || '',
+    image: row.image || ''
+  })
   editVisible.value = true
 }
 
@@ -417,11 +433,27 @@ const handleSave = async () => {
 
     saving.value = true
     try {
+      // 只提交后端需要的字段，避免多余字段
+      const submitData = {
+        brand: form.brand || '',
+        model: form.model || '',
+        type: form.type || '',
+        description: form.description || '',
+        image: form.image || '',
+        pricePerDay: Number(form.pricePerDay) || 0,
+        stock: Number(form.stock) || 0,
+        flightTime: Number(form.flightTime) || 0,
+        maxSpeed: Number(form.maxSpeed) || 0,
+        maxPayload: Number(form.maxPayload) || 0,
+        status: form.status != null ? Number(form.status) : 1,
+        onShelf: form.onShelf != null ? Number(form.onShelf) : 1
+      }
+
       if (isEdit.value) {
-        await updateDrone(currentDrone.value.id, form)
+        await updateDrone(currentDrone.value.id, submitData)
         ElMessage.success('更新成功')
       } else {
-        await createDrone(form)
+        await createDrone(submitData)
         ElMessage.success('新增成功')
       }
       editVisible.value = false

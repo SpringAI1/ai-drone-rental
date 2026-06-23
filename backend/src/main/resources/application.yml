@@ -9,10 +9,8 @@ spring:
 
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/drone_rental?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&cachePrepStmts=true&prepStmtCacheSize=512&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true&rewriteBatchedStatements=true&allowMultiQueries=true&connectionTimeout=3000&socketTimeout=30000&autoReconnect=true
-    username: root
-    password: chenxi750213
+    driver-class-name: org.sqlite.JDBC
+    url: jdbc:sqlite:drone_rental.db
     druid:
       initial-size: 10
       min-idle: 5
@@ -29,6 +27,13 @@ spring:
       pool-prepared-statements: true
       max-pool-prepared-statement-per-connection-size: 50
       filters: stat
+
+  sql:
+    init:
+      mode: never
+      schema-locations:
+        - classpath:sql/init.sqlite.sql
+      separator: ;
 
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
@@ -97,7 +102,7 @@ springdoc:
     path: /swagger-ui/index.html
 
 file:
-  upload-path: uploads/
+  upload-path: ../uploads/
   access-url: /uploads/
 
 logging:

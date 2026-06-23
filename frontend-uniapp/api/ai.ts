@@ -12,5 +12,5 @@ export interface ChatResult {
 }
 
 export function chat(data: ChatParams) {
-  return post<ChatResult>('/ai/v2/chat', data)
+  return post<ChatResult>('/ai/chat', data)
 }

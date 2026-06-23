@@ -1,4 +1,5 @@
 import { mockStats, mockDrones, mockOrders, mockOrderStats, mockUserInfo, mockAirspaceRecords, mockNotifications, mockComments, mockBrands, mockTypes } from './mock'
+import { encryptRequest, decryptResponse, ENCRYPTION_ENABLED } from './encryption'
 
 export const BASE_URL = 'http://localhost:8080/api'
 
@@ -96,25 +97,72 @@ function buildMockResponse<T>(url: string, method: string, data?: Record<string,
   return { code: 200, message: 'success', data: null as unknown as T, success: true }
 }
 
+// 判断是否需要加密（与 web 端逻辑一致）
+function shouldEncrypt(options: RequestOptions): boolean {
+  if (!ENCRYPTION_ENABLED) return false
+  const method = (options.method || 'GET').toUpperCase()
+  if (method === 'GET') return false
+
+  const url = (options.url || '').trim()
+  if (url.startsWith('/public/')) return false
+  if (url.includes('/common/upload')) return false
+  if (url.startsWith('/ws/')) return false
+  if (options.data === undefined || options.data === null) return false
+  return true
+}
+
 export function request<T = any>(options: RequestOptions): Promise<ResponseData<T>> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const mockResponse = buildMockResponse<T>(options.url, options.method || 'GET', options.data)
 
     if (options.loading !== false) {
       uni.showLoading({ title: '加载中...', mask: true })
     }
 
+    // 自动从本地存储读取 token，附加到请求头
+    const token = uni.getStorageSync('token') || ''
+    const authHeader = token ? { Authorization: `Bearer ${token}` } : {}
+
+    // ========== RSA+AES 信封加密：请求 ==========
+    let payload: any = options.data
+    const extraHeaders: Record<string, string> = {}
+    if (shouldEncrypt(options) && options.data && Object.keys(options.data).length > 0) {
+      try {
+        payload = await encryptRequest(options.data)
+        extraHeaders['X-Encrypted'] = '1'
+      } catch (err) {
+        console.warn('[encryption] 请求加密失败，降级为明文', err)
+        payload = options.data
+      }
+    }
+
     uni.request({
       url: BASE_URL + options.url,
       method: options.method || 'GET',
-      data: options.data,
+      data: payload,
       header: {
         'Content-Type': 'application/json',
+        ...authHeader,
+        ...extraHeaders,
         ...options.header
       },
       success: (res) => {
         if (options.loading !== false) uni.hideLoading()
-        const response = res.data as ResponseData<T>
+
+        let response = res.data as ResponseData<T>
+
+        // ========== RSA+AES 信封解密：响应 ==========
+        if (response && (response as any).encrypted === true) {
+          try {
+            response = decryptResponse(response as any)
+          } catch (err) {
+            console.error('[encryption] 响应解密失败', err)
+            uni.showToast({ title: '响应解密失败', icon: 'none' })
+            reject({ code: 500, message: '响应解密失败', data: null, success: false } as any)
+            return
+          }
+        }
+
         if (response && response.code === 200) {
           resolve(response)
         } else if (response && response.code === 401) {
@@ -123,7 +171,7 @@ export function request<T = any>(options: RequestOptions): Promise<ResponseData<
           uni.redirectTo({ url: '/pages/user/login' })
           reject(response)
         } else {
-          resolve({ code: 200, message: 'success', data: mockResponse?.data as T, success: true })
+          resolve(response)
         }
       },
       fail: () => {
@@ -131,7 +179,7 @@ export function request<T = any>(options: RequestOptions): Promise<ResponseData<
         if (mockResponse) {
           setTimeout(() => resolve(mockResponse), 100)
         } else {
-          reject({ code: 500, message: '网络异常', data: null, success: false })
+          reject({ code: 500, message: '网络异常', data: null, success: false } as any)
         }
       }
     })

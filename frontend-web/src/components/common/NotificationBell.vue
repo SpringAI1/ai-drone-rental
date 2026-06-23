@@ -58,9 +58,12 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Bell, Document, CircleCheck, InfoFilled } from '@element-plus/icons-vue'
-import { getNotifications, getUnreadCount, markAsRead, markAllAsRead } from '@/api/notification'
+import { ElMessage } from 'element-plus'
+import { getNotifications, getUnreadCount, markAsRead, markAllAsRead, getAdminNotifications, getAdminUnreadCount, adminMarkAsRead, adminMarkAllAsRead } from '@/api/notification'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 const loading = ref(false)
 const notifications = ref([])
@@ -103,7 +106,9 @@ const formatTime = (time) => {
 const fetchNotifications = async () => {
   loading.value = true
   try {
-    const res = await getNotifications({ pageNum: 1, pageSize: pageSize })
+    const res = authStore.isAdmin
+      ? await getAdminNotifications({ pageNum: 1, pageSize: pageSize })
+      : await getNotifications({ pageNum: 1, pageSize: pageSize })
     notifications.value = res.data?.records || []
     total.value = res.data?.total || 0
   } catch (error) {
@@ -115,7 +120,9 @@ const fetchNotifications = async () => {
 
 const fetchUnreadCount = async () => {
   try {
-    const res = await getUnreadCount()
+    const res = authStore.isAdmin
+      ? await getAdminUnreadCount()
+      : await getUnreadCount()
     unreadCount.value = res.data?.count || 0
   } catch (error) {
     console.error('获取未读数量失败:', error)
@@ -124,19 +131,36 @@ const fetchUnreadCount = async () => {
 
 const handleClick = async (item) => {
   if (item.readStatus === 0) {
-    await markAsRead(item.id)
+    if (authStore.isAdmin) {
+      await adminMarkAsRead(item.id)
+    } else {
+      await markAsRead(item.id)
+    }
     unreadCount.value--
   }
 
   if (item.type === 1 && item.businessId) {
-    router.push(`/orders/${item.businessId}`)
+    if (authStore.isAdmin) {
+      router.push('/admin/orders')
+    } else {
+      router.push(`/orders/${item.businessId}`)
+    }
   }
 }
 
 const handleMarkAllRead = async () => {
-  await markAllAsRead()
-  unreadCount.value = 0
-  notifications.value.forEach(n => n.readStatus = 1)
+  try {
+    // 后端 /notification/read-all 会根据当前用户角色自动判断：
+    // - 管理员：标记 userId=-1 的所有通知
+    // - 普通用户：标记自己的所有通知
+    await markAllAsRead()
+    unreadCount.value = 0
+    notifications.value.forEach(n => n.readStatus = 1)
+    ElMessage.success('已全部已读')
+    window.dispatchEvent(new Event('notification-unread-updated'))
+  } catch (err) {
+    ElMessage.error('操作失败')
+  }
 }
 
 let timer = null

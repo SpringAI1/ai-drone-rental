@@ -1,0 +1,595 @@
+<template>
+  <view class="orders-page">
+    <!-- 状态 tabs（整行横排） -->
+    <view class="status-tabs">
+      <view
+        class="status-tab"
+        v-for="(tab, index) in statusTabs"
+        :key="tab.label"
+        :class="{ active: activeStatus === index }"
+        @click="switchStatus(index)"
+      >
+        <text class="status-tab-text">{{ tab.label }}</text>
+        <text class="status-tab-count" v-if="tab.count > 0">{{ tab.count }}</text>
+      </view>
+    </view>
+
+    <!-- 订单卡片列表 -->
+    <view class="order-list">
+      <view
+        class="order-card"
+        v-for="order in filteredOrders"
+        :key="order.id"
+      >
+        <view class="order-card-header">
+          <text class="order-no">订单号 {{ order.orderNo }}</text>
+          <text class="order-status" :class="getStatusClass(order.status)">{{
+            getStatusLabel(order.status)
+          }}</text>
+        </view>
+
+        <view class="order-card-body" @click="goToDetail(order.id)">
+          <view class="order-product">
+            <view class="order-img-box">
+              <image class="order-img" :src="order.image" mode="aspectFit" />
+            </view>
+            <view class="order-info">
+              <text class="order-name">{{ order.name }}</text>
+              <text class="order-spec">{{ order.spec }}</text>
+              <view class="order-rental">
+                <text class="order-rental-text">{{ order.rentalDays }}天租期</text>
+              </view>
+            </view>
+          </view>
+          <view class="order-amount-row">
+            <text class="order-amount-label">合计</text>
+            <text class="order-amount">¥{{ order.amount }}</text>
+          </view>
+        </view>
+
+        <view class="order-card-footer">
+          <view class="order-time-row">
+            <text class="order-time">{{ order.createTime }}</text>
+          </view>
+          <view class="order-actions">
+            <view
+              class="order-btn outline"
+              v-if="showCancel(order.status)"
+              @click="handleCancel(order)"
+            >
+              <text class="order-btn-text">取消订单</text>
+            </view>
+            <view
+              class="order-btn outline"
+              v-if="showContact(order.status)"
+              @click="handleContact"
+            >
+              <text class="order-btn-text">联系客服</text>
+            </view>
+            <view
+              class="order-btn primary"
+              v-if="showPay(order.status)"
+              @click="handlePay(order)"
+            >
+              <text class="order-btn-text light">立即支付</text>
+            </view>
+            <view
+              class="order-btn primary"
+              v-if="showReceive(order.status)"
+              @click="handleReceive(order)"
+            >
+              <text class="order-btn-text light">确认收货</text>
+            </view>
+            <view
+              class="order-btn primary"
+              v-if="showReturn(order.status)"
+              @click="handleReturn(order)"
+            >
+              <text class="order-btn-text light">归还设备</text>
+            </view>
+            <view
+              class="order-btn primary"
+              v-if="showComment(order.status)"
+              @click="handleComment(order)"
+            >
+              <text class="order-btn-text light">去评价</text>
+            </view>
+            <view
+              class="order-btn outline"
+              v-if="showReorder(order.status)"
+              @click="handleReorder(order)"
+            >
+              <text class="order-btn-text">再次租赁</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="bottom-space"></view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import { getOrderList, getOrderStats, cancelOrder, payOrder, receiveOrder, returnOrder } from '../../api/order'
+import { resolveImageUrl } from '../../utils/image'
+
+interface StatusTab {
+  label: string
+  status: number
+  count: number
+}
+
+interface OrderItem {
+  id: number
+  orderNo: string
+  droneId: number
+  droneName: string
+  droneBrand: string
+  droneType: string
+  droneImage: string
+  name: string
+  spec: string
+  rentalDays: number
+  amount: number
+  image: string
+  status: number
+  createTime: string
+  startDate?: string
+  endDate?: string
+  hasCommented?: boolean
+}
+
+const statusTabs = ref<StatusTab[]>([
+  { label: '全部', status: -1, count: 0 },
+  { label: '待支付', status: 0, count: 0 },
+  { label: '待发货', status: 1, count: 0 },
+  { label: '待收货', status: 2, count: 0 },
+  { label: '租赁中', status: 3, count: 0 },
+  { label: '已归还', status: 4, count: 0 },
+  { label: '已取消', status: 6, count: 0 }
+])
+
+const activeStatus = ref<number>(0)
+const orders = ref<OrderItem[]>([])
+
+const filteredOrders = computed<OrderItem[]>(() => {
+  if (activeStatus.value === 0) return orders.value
+  const tabStatus = statusTabs.value[activeStatus.value]?.status
+  if (tabStatus === undefined) return orders.value
+  return orders.value.filter((o) => Number(o.status) === Number(tabStatus))
+})
+
+const switchStatus = (index: number) => {
+  activeStatus.value = index
+  loadOrders()
+}
+
+const loadOrderStats = async () => {
+  try {
+    const res = await getOrderStats()
+    const stats = (res.data as any) || {}
+    const statMap: Record<number, number> = {
+      0: stats.pendingPay || 0,
+      1: stats.pendingShip || 0,
+      2: stats.pendingReceive || 0,
+      3: stats.renting || 0,
+      4: stats.returned || 0,
+      6: stats.canceled || 0
+    }
+    statusTabs.value = statusTabs.value.map((tab) => {
+      if (tab.status === -1) {
+        return { ...tab, count: Object.values(statMap).reduce((a, b) => Number(a) + Number(b), 0) }
+      }
+      return { ...tab, count: statMap[tab.status] || 0 }
+    })
+  } catch (err) {
+    console.error('获取订单统计失败', err)
+  }
+}
+
+const loadOrders = async () => {
+  try {
+    const tabStatus = statusTabs.value[activeStatus.value]?.status
+    const params: any = { pageNum: 1, pageSize: 50 }
+    if (tabStatus !== undefined && tabStatus !== -1) {
+      params.orderStatus = tabStatus
+    }
+    const res = await getOrderList(params)
+    const records = ((res.data as any)?.records) || []
+    orders.value = records.map((o: any) => {
+      const brand = o.droneBrand || o.brand || ''
+      const type = o.droneType || o.type || ''
+      const rawImage = o.droneImage || o.image || '/uploads/mavic3_drone.png'
+      const days = o.rentalDays || o.days || 0
+      const startDate = o.rentalStartTime || o.startDate || ''
+      const endDate = o.rentalEndTime || o.endDate || ''
+      const specText = startDate && endDate ? (startDate + ' 至 ' + endDate) : (brand + ' · ' + type)
+      return {
+        id: o.id,
+        orderNo: o.orderNo || ('R' + o.id),
+        droneId: o.droneId || 0,
+        droneName: o.droneModel || o.droneName || o.name || '无人机',
+        droneBrand: brand,
+        droneType: type,
+        droneImage: resolveImageUrl(rawImage),
+        name: o.droneModel || o.droneName || o.name || '无人机',
+        spec: specText,
+        rentalDays: days,
+        amount: o.totalAmount || o.amount || 0,
+        image: resolveImageUrl(rawImage),
+        status: Number(o.orderStatus !== undefined ? o.orderStatus : o.status),
+        createTime: o.createdTime || o.createTime || '',
+        startDate: startDate,
+        endDate: endDate,
+        hasCommented: o.hasComment || false
+      } as OrderItem
+    })
+  } catch (err) {
+    console.error('获取订单列表失败', err)
+    orders.value = []
+  }
+}
+
+const getStatusLabel = (status: number): string => {
+  const map = new Map<number, string>()
+  map.set(0, '待支付')
+  map.set(1, '待发货')
+  map.set(2, '待收货')
+  map.set(3, '租赁中')
+  map.set(4, '已归还')
+  map.set(5, '已完成')
+  map.set(6, '已取消')
+  return map.get(status) || '未知'
+}
+
+const getStatusClass = (status: number): string => {
+  if (status === 0) return 'pay'
+  if (status === 4 || status === 5) return 'done'
+  if (status === 6) return 'cancel'
+  return 'normal'
+}
+
+const showCancel = (status: number): boolean => status === 0 || status === 1 || status === 2
+const showPay = (status: number): boolean => status === 0
+const showContact = (_: number): boolean => true
+const showReceive = (status: number): boolean => status === 2
+const showReturn = (status: number): boolean => status === 3
+const showComment = (status: number): boolean => status === 4
+const showReorder = (status: number): boolean => status === 4 || status === 6
+
+const goToDetail = (id: number) => {
+  uni.navigateTo({ url: `/pages/orders/detail?id=${id}` })
+}
+
+const handleCancel = (order: OrderItem) => {
+  uni.showModal({
+    title: '提示',
+    content: '确定取消该订单吗?',
+    success: async (res) => {
+      if (res.confirm) {
+        try {
+          await cancelOrder(order.id)
+          uni.showToast({ title: '已取消订单', icon: 'success' })
+          loadOrders()
+        } catch (err) {
+          console.error('取消订单失败', err)
+        }
+      }
+    }
+  })
+}
+
+const handleContact = () => {
+  uni.navigateTo({ url: '/pages/chat/index' })
+}
+
+const handlePay = async (order: OrderItem) => {
+  uni.showModal({
+    title: '支付',
+    content: `确认支付 ¥${order.amount} ?`,
+    success: async (res) => {
+      if (res.confirm) {
+        try {
+          await payOrder(order.id, 1)
+          uni.showToast({ title: '支付成功', icon: 'success' })
+          loadOrders()
+        } catch (err) {
+          console.error('支付失败', err)
+        }
+      }
+    }
+  })
+}
+
+const handleReceive = async (order: OrderItem) => {
+  try {
+    await receiveOrder(order.id)
+    uni.showToast({ title: '已确认收货', icon: 'success' })
+    loadOrders()
+  } catch (err) {
+    console.error('确认收货失败', err)
+  }
+}
+
+const handleReturn = async (order: OrderItem) => {
+  uni.showModal({
+    title: '提示',
+    content: '确定要归还该设备吗?',
+    success: async (res) => {
+      if (res.confirm) {
+        try {
+          await returnOrder(order.id)
+          uni.showToast({ title: '归还成功', icon: 'success' })
+          loadOrders()
+        } catch (err) {
+          console.error('归还失败', err)
+        }
+      }
+    }
+  })
+}
+
+const handleComment = (order: OrderItem) => {
+  const params = `?id=${order.droneId}&orderId=${order.id}&name=${encodeURIComponent(order.name)}&brand=${encodeURIComponent(order.droneBrand)}&type=${encodeURIComponent(order.droneType)}&price=${order.amount}&image=${encodeURIComponent(order.image)}`
+  uni.navigateTo({ url: '/pages/orders/comment' + params })
+}
+
+const handleReorder = (_: OrderItem) => {
+  uni.switchTab({ url: '/pages/drones/list' })
+}
+
+onShow(() => {
+  loadOrderStats()
+  loadOrders()
+})
+
+onMounted(() => {
+  loadOrderStats()
+  loadOrders()
+})
+</script>
+
+<style lang="scss">
+page {
+  min-height: 100vh;
+  background: #f1f5f9;
+}
+
+.orders-page {
+  min-height: 100vh;
+  background: #f1f5f9;
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 状态 Tabs */
+.status-tabs {
+  display: flex;
+  flex-direction: row;
+  background: #ffffff;
+  padding: 16rpx 20rpx;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.status-tab {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 12rpx 20rpx;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+  margin-right: 12rpx;
+  flex-shrink: 0;
+
+  &.active {
+    background: #2563eb;
+  }
+}
+
+.status-tab-text {
+  font-size: 24rpx;
+  color: #475569;
+  font-weight: 500;
+}
+
+.status-tab.active .status-tab-text {
+  color: #ffffff;
+}
+
+.status-tab-count {
+  font-size: 20rpx;
+  color: #ef4444;
+  margin-left: 6rpx;
+  font-weight: 600;
+}
+
+.status-tab.active .status-tab-count {
+  color: #fef3c7;
+}
+
+/* 订单列表 */
+.order-list {
+  padding: 16rpx 20rpx;
+}
+
+.order-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  margin-bottom: 16rpx;
+  overflow: hidden;
+}
+
+.order-card-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 20rpx;
+  border-bottom: 2rpx solid #f1f5f9;
+}
+
+.order-no {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.order-status {
+  font-size: 24rpx;
+  font-weight: 600;
+
+  &.pay {
+    color: #f59e0b;
+  }
+  &.normal {
+    color: #2563eb;
+  }
+  &.done {
+    color: #16a34a;
+  }
+  &.cancel {
+    color: #94a3b8;
+  }
+}
+
+/* 订单产品信息 */
+.order-card-body {
+  padding: 16rpx 20rpx;
+}
+
+.order-product {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.order-img-box {
+  width: 160rpx;
+  height: 120rpx;
+  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-radius: 14rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 16rpx;
+}
+
+.order-img {
+  width: 140rpx;
+  height: 100rpx;
+}
+
+.order-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.order-name {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 6rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-spec {
+  font-size: 22rpx;
+  color: #64748b;
+  margin-bottom: 8rpx;
+}
+
+.order-rental {
+  display: flex;
+  flex-direction: row;
+}
+
+.order-rental-text {
+  font-size: 22rpx;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+}
+
+.order-amount-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  padding-top: 12rpx;
+  border-top: 2rpx solid #f8fafc;
+}
+
+.order-amount-label {
+  font-size: 22rpx;
+  color: #64748b;
+  margin-right: 10rpx;
+}
+
+.order-amount {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #ef4444;
+}
+
+/* 底部操作栏 */
+.order-card-footer {
+  padding: 14rpx 20rpx;
+  border-top: 2rpx solid #f1f5f9;
+  background: #fafbfc;
+}
+
+.order-time-row {
+  margin-bottom: 12rpx;
+}
+
+.order-time {
+  font-size: 20rpx;
+  color: #94a3b8;
+}
+
+.order-actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.order-btn {
+  padding: 12rpx 22rpx;
+  border-radius: 999rpx;
+  margin-left: 12rpx;
+
+  &.outline {
+    border: 2rpx solid #cbd5e1;
+    background: #ffffff;
+  }
+
+  &.primary {
+    background: #2563eb;
+  }
+}
+
+.order-btn-text {
+  font-size: 22rpx;
+  color: #475569;
+  font-weight: 500;
+
+  &.light {
+    color: #ffffff;
+  }
+}
+
+.bottom-space {
+  height: 60rpx;
+}
+</style>

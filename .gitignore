@@ -1,5 +1,5 @@
 # =========================================
-# 后端（Java / Spring Boot / Maven
+# 后端（Java / Spring Boot / Maven）
 # =========================================
 
 # Maven 编译产物
@@ -17,7 +17,7 @@ target/
 *.iws
 .vscode/
 
-# 数据库文件（MySQL/SQLite）
+# 数据库文件（SQLite）
 # 注意：drone_rental.db 仅作为示例，可按需保留
 # drone_rental.db
 
@@ -39,6 +39,24 @@ dist/
 build/
 .output/
 
+# 前端临时/调试脚本（不应进入版本库）
+frontend-web/comprehensive_test.cjs
+frontend-web/debug_*.cjs
+frontend-web/debug_*.mjs
+frontend-web/diagnose_*.cjs
+frontend-web/deep_diagnose.cjs
+frontend-web/e2e_encryption_test.cjs
+frontend-web/e2e_encryption_test.mjs
+frontend-web/final_test.cjs
+frontend-web/fix_*.cjs
+frontend-web/fix_*.mjs
+frontend-web/fix_*.py
+frontend-web/path_diag.cjs
+frontend-web/qual_diag.cjs
+frontend-web/quick_check.cjs
+frontend-web/simple_diag.cjs
+frontend-web/test_*.cjs
+
 # =========================================
 # UniApp 小程序
 # =========================================
@@ -47,7 +65,7 @@ build/
 unpackage/
 frontend-uniapp/unpackage/
 
-# .hbuilderx 项目配置（IDE 文件
+# .hbuilderx 项目配置（IDE 文件）
 .hbuilderx/
 
 # =========================================
@@ -78,30 +96,21 @@ Thumbs.db
 *.sw?
 
 # =========================================
-# 临时/
+# 项目根目录：临时 / 调试 / 文档
 # =========================================
 
-# 注意：以下文件被提交！
-# =========================================
+# 个人 README
+PROFILE_README.md
 
-# ✅ 以下文件都会被提交
-# backend/uploads/ 所有图片资源
-# backend/sql/ 数据库脚本
-# docs/ 项目文档
-# frontend-uniapp/static/ 小程序图片和图标
-# frontend-web/src/assets/ 管理端资源
+# 一次性脚本与文档
+/test_*.sh
+/verify_*.sh
+/env_check.sh
+/e2e_*.mjs
+/scripts/
 
-# =========================================
-# 其他常见文件允许上传
-# =========================================
-
-# 图片格式（全部允许）
-# 图片文件全部允许上传（默认允许提交（
-
-# 上传目录允许
-# =========================================
-# 确保所有图片、图标、文档全部提交
-# =========================================
-# 不会主动忽略任何图片或图标，它们都属于提交
+# 数据库临时文件
+/drone_rental.db
+/drone_rental.db.bak
 
 # 结束

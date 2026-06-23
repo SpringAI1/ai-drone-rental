@@ -44,7 +44,7 @@
         </div>
         <div class="order-footer">
           <div class="order-actions">
-            <el-button @click="handleRefund(order)">申请退款</el-button>
+            <el-button @click="handleCancel(order)">取消订单</el-button>
           </div>
         </div>
       </GlassCard>
@@ -80,7 +80,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import GlassCard from '@/components/common/GlassCard.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { getMyOrders, applyRefund } from '@/api/order'
+import { getMyOrders, cancelOrder } from '@/api/order'
 
 const router = useRouter()
 const loading = ref(false)
@@ -106,6 +106,9 @@ const formatDate = (dateTime) => {
 const getImageUrl = (url) => {
   if (!url) return ''
   if (url.startsWith('http')) return url
+  if (url.startsWith('/api/uploads/')) return url
+  if (url.startsWith('/uploads/')) return `/api${url}`
+  if (!url.startsWith('/')) return `/api/uploads/${url}`
   return `/api${url}`
 }
 
@@ -130,16 +133,16 @@ const goToDetail = (id) => {
   router.push(`/orders/${id}`)
 }
 
-const handleRefund = async (order) => {
+const handleCancel = async (order) => {
   try {
-    await ElMessageBox.prompt('请输入退款原因', '申请退款', {
+    await ElMessageBox.prompt('请输入取消原因', '取消订单', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       inputPattern: /.+/,
-      inputErrorMessage: '请输入退款原因'
+      inputErrorMessage: '请输入取消原因'
     }).then(async ({ value }) => {
-      await applyRefund(order.id, value)
-      ElMessage.success('退款申请已提交')
+      await cancelOrder(order.id, value)
+      ElMessage.success('订单已取消')
       fetchOrders()
     })
   } catch {

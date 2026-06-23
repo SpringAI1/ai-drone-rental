@@ -190,10 +190,13 @@ const formatDateTime = (dateTime) => {
   return dateTime.replace('T', ' ').substring(0, 19)
 }
 
-// 获取图片完整URL
+// 获取图片完整URL（兼容多种路径格式）
 const getImageUrl = (url) => {
   if (!url) return ''
   if (url.startsWith('http')) return url
+  if (url.startsWith('/api/uploads/')) return url
+  if (url.startsWith('/uploads/')) return `/api${url}`
+  if (!url.startsWith('/')) return `/api/uploads/${url}`
   return `/api${url}`
 }
 

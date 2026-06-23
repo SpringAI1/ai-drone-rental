@@ -187,6 +187,9 @@ const userBalance = computed(() => authStore.user?.balance || 0)
 const getImageUrl = (url) => {
   if (!url) return ''
   if (url.startsWith('http')) return url
+  if (url.startsWith('/api/uploads/')) return url
+  if (url.startsWith('/uploads/')) return `/api${url}`
+  if (!url.startsWith('/')) return `/api/uploads/${url}`
   return `/api${url}`
 }
 

@@ -69,14 +69,24 @@
         </div>
 
         <div class="admin-header__right">
-          <!-- 订单通知铃铛（实时） -->
-          <el-tooltip content="系统通知" placement="bottom">
+          <!-- 订单通知铃铛（实时 + 全部已读下拉） -->
+          <el-dropdown trigger="click" @command="handleBellCommand" placement="bottom-end">
             <el-badge :value="unreadNotificationCount" :max="99" :hidden="unreadNotificationCount === 0">
-              <el-button text circle @click="router.push('/admin/notifications')">
+              <el-button text circle>
                 <el-icon :size="20"><Bell /></el-icon>
               </el-button>
             </el-badge>
-          </el-tooltip>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="mark-all">
+                  <el-icon><Check /></el-icon>全部已读
+                </el-dropdown-item>
+                <el-dropdown-item divided command="view-all">
+                  <el-icon><Document /></el-icon>查看全部通知
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
 
           <!-- 待办提醒（资质审核） -->
           <el-tooltip content="资质待审核" placement="bottom">
@@ -102,7 +112,7 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="home">
-                  <el-icon><HomeFilled /></el-icon>返回前台
+                  <el-icon><HomeFilled /></el-icon>管理控制台
                 </el-dropdown-item>
                 <el-dropdown-item divided command="logout">
                   <el-icon><SwitchButton /></el-icon>退出登录
@@ -179,12 +189,13 @@ import {
   Fold,
   Warning,
   Cpu,
-  Location
+  Location,
+  Check
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAuditStats } from '@/api/admin'
-import { getAdminUnreadCount } from '@/api/notification'
+import { getAdminUnreadCount, adminMarkAllAsRead } from '@/api/notification'
 import AiChat from '@/components/common/AiChat.vue'
 
 const router = useRouter()
@@ -216,49 +227,34 @@ const connectOrderWebSocket = () => {
         const msg = JSON.parse(event.data)
         console.log('[WS] 收到消息', msg)
 
-        // 所有合法的通知类型都 +1
+        // 系统控制消息（连接成功/心跳）不弹提示也不计数
+        if (!msg || msg.type === 'connected' || msg.type === 'pong') return
+
+        // 只对真实业务事件处理：+1 未读数 + 轻提示
+        const validTypes = ['new_order', 'new_comment', 'new_fault', 'new_airspace']
+        if (!validTypes.includes(msg.type)) return
+
+        unreadNotificationCount.value = Math.min(unreadNotificationCount.value + 1, 99)
+
+        let tip = '收到新通知'
+        let msgType = 'info'
         if (msg.type === 'new_order') {
-          // 新订单：更新未读数量 +1
-          unreadNotificationCount.value = Math.min(unreadNotificationCount.value + 1, 99)
-          // 弹出轻提示
-          ElMessage({
-            message: `收到新订单：${msg.orderNo || ''}`,
-            type: 'info',
-            duration: 2500
-          })
+          tip = `收到新订单：${msg.orderNo || ''}`
         } else if (msg.type === 'new_comment') {
-          // 新评论审核：未读 +1
-          unreadNotificationCount.value = Math.min(unreadNotificationCount.value + 1, 99)
-          ElMessage({
-            message: `收到新评论：${msg.droneName || msg.content || ''}`.substring(0, 30),
-            type: 'warning',
-            duration: 2500
-          })
+          tip = `收到新评论：${(msg.droneName || msg.content || '').substring(0, 30)}`
+          msgType = 'warning'
         } else if (msg.type === 'new_fault') {
-          // 新故障报修：未读 +1
-          unreadNotificationCount.value = Math.min(unreadNotificationCount.value + 1, 99)
-          ElMessage({
-            message: `收到新故障报修：${msg.droneName || msg.content || ''}`.substring(0, 30),
-            type: 'error',
-            duration: 2500
-          })
+          tip = `收到新故障报修：${(msg.droneName || msg.content || '').substring(0, 30)}`
+          msgType = 'error'
         } else if (msg.type === 'new_airspace') {
-          // 新空域备案：未读 +1
-          unreadNotificationCount.value = Math.min(unreadNotificationCount.value + 1, 99)
-          ElMessage({
-            message: `收到新空域备案申请`,
-            type: 'info',
-            duration: 2500
-          })
-        } else {
-          // 其它类型通知：未读 +1
-          unreadNotificationCount.value = Math.min(unreadNotificationCount.value + 1, 99)
-          ElMessage({
-            message: msg.title || '收到新通知',
-            type: 'info',
-            duration: 2500
-          })
+          tip = '收到新空域备案申请'
         }
+
+        ElMessage({
+          message: tip,
+          type: msgType,
+          duration: 2500
+        })
       } catch (e) {
         console.warn('[WS] 消息解析失败', e)
       }
@@ -326,7 +322,7 @@ const menuItems = computed(() => [
   { path: '/admin/airspace-audit', title: '空域备案审核', icon: Location },
   { path: '/admin/maintenance', title: '维保管理', icon: SetUp },
   { path: '/admin/comments', title: '评价管理', icon: ChatLineSquare },
-  { path: '/admin/ai', title: 'AI管理', icon: Cpu },
+  { path: '/admin/ai-management', title: 'AI管理', icon: Cpu },
   { path: '/admin/notifications', title: '系统通知', icon: Bell, badge: unreadNotificationCount.value || null }
 ])
 
@@ -348,10 +344,34 @@ const isActive = (path) => {
 
 const logoutConfirming = ref(false)
 
+const handleBellCommand = async (command) => {
+  switch (command) {
+    case 'mark-all':
+      try {
+        const res = await adminMarkAllAsRead()
+        if (res.code === 200) {
+          // 先本地清零，再拉一次 DB 状态做双保险
+          unreadNotificationCount.value = 0
+          await fetchUnreadNotificationCount()
+          ElMessage.success('已全部标记为已读')
+        } else {
+          ElMessage.error(res.message || '操作失败')
+        }
+      } catch (err) {
+        console.error(err)
+        ElMessage.error('操作失败')
+      }
+      break
+    case 'view-all':
+      router.push('/admin/notifications')
+      break
+  }
+}
+
 const handleCommand = async (command) => {
   switch (command) {
     case 'home':
-      router.push('/')
+      router.push('/admin')
       break
     case 'logout':
       if (logoutConfirming.value) return

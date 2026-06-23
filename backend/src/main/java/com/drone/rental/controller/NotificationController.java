@@ -87,4 +87,13 @@ public class NotificationController {
         notificationService.adminMarkAllAsRead();
         return Result.success();
     }
+
+    /**
+     * 管理员一键清空所有通知（物理删除）
+     */
+    @DeleteMapping("/admin/clear")
+    public Result<Void> adminClearAll() {
+        notificationService.adminClearAll();
+        return Result.success();
+    }
 }

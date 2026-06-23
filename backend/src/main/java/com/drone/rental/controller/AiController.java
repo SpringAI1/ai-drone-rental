@@ -82,28 +82,104 @@ public class AiController {
         } catch (Exception ignored) {
         }
 
+        // 1) 拉取历史消息（最近的 N 条），形成多轮对话上下文
+        List<AiChatMessage> history = new ArrayList<>();
         try {
-            // 优先使用本地知识库 - 稳定无依赖
-            String reply = getLocalKnowledgeReply(message);
-
-            try {
-                aiChatMessageService.saveMessage(conversationId, userId, "user", message, model);
-                aiChatMessageService.saveMessage(conversationId, null, "ai", reply, model);
-            } catch (Exception ignored) {
-                // 记录失败不影响回复
-            }
-
-            Map<String, String> result = new HashMap<>();
-            result.put("conversationId", conversationId);
-            result.put("reply", reply);
-            return Result.success(result);
-        } catch (Exception e) {
-            System.out.println("AI 回复失败，使用兜底: " + e.getMessage());
-            Map<String, String> result = new HashMap<>();
-            result.put("conversationId", conversationId);
-            result.put("reply", defaultReply());
-            return Result.success(result);
+            history = aiChatMessageService.getRecentMessages(conversationId, 10);
+        } catch (Exception ignored) {
         }
+
+        String reply = null;
+        boolean usedLLM = false;
+
+        // 2) 优先调通义千问 LLM，得到真正"智能"的回复
+        try {
+            reply = chatWithLLM(history, message);
+            usedLLM = reply != null && !reply.isEmpty();
+        } catch (Exception e) {
+            System.out.println("LLM 调用失败，使用本地知识库兜底: " + e.getMessage());
+        }
+
+        // 3) LLM 失败 / 不可用时，回退到本地关键字知识库
+        if (!usedLLM) {
+            reply = getLocalKnowledgeReply(message);
+        }
+
+        // 4) 记录到对话历史（失败也不影响主流程）
+        try {
+            aiChatMessageService.saveMessage(conversationId, userId, "user", message, usedLLM ? model : "local-kb");
+            aiChatMessageService.saveMessage(conversationId, null, "ai", reply, usedLLM ? model : "local-kb");
+        } catch (Exception ignored) {
+        }
+
+        Map<String, String> result = new HashMap<>();
+        result.put("conversationId", conversationId);
+        result.put("reply", reply);
+        return Result.success(result);
+    }
+
+    /**
+     * 调用通义千问 LLM 进行多轮对话
+     */
+    private String chatWithLLM(List<AiChatMessage> history, String currentMessage) {
+        String systemPrompt = "你是「智飞租赁」的 AI 智能客服助手，专精于无人机租赁业务。请遵循以下原则：\n" +
+                "1) 回答简洁专业，控制在 200 字以内，使用中文。\n" +
+                "2) 涉及价格、押金、流程、机型推荐等问题时，给出明确数字和步骤。\n" +
+                "3) 如果用户询问的是业务范围外的问题（如医疗、法律建议），礼貌引导回业务主题。\n" +
+                "4) 不确定时说明并建议拨打人工客服 400-800-8888。\n" +
+                "5) 体现自然语言理解能力：能识别同义表达、能结合上下文、能理解多轮对话。";
+
+        List<Map<String, Object>> messages = new ArrayList<>();
+        Map<String, Object> sys = new HashMap<>();
+        sys.put("role", "system");
+        sys.put("content", systemPrompt);
+        messages.add(sys);
+
+        for (AiChatMessage h : history) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("role", "ai".equals(h.getRole()) ? "assistant" : "user");
+            m.put("content", h.getContent());
+            messages.add(m);
+        }
+
+        Map<String, Object> userMsg = new HashMap<>();
+        userMsg.put("role", "user");
+        userMsg.put("content", currentMessage);
+        messages.add(userMsg);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", model);
+        body.put("temperature", temperature);
+        body.put("max_tokens", maxTokens);
+        body.put("messages", messages);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer " + apiKey);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        ResponseEntity<Map> response = restTemplate.postForEntity(baseUrl + "/chat/completions", entity, Map.class);
+
+        if (response.getBody() == null) {
+            return null;
+        }
+        Object choicesObj = response.getBody().get("choices");
+        if (!(choicesObj instanceof List) || ((List<?>) choicesObj).isEmpty()) {
+            return null;
+        }
+        Object choice0 = ((List<?>) choicesObj).get(0);
+        if (!(choice0 instanceof Map)) {
+            return null;
+        }
+        Object messageObj = ((Map<?, ?>) choice0).get("message");
+        if (!(messageObj instanceof Map)) {
+            return null;
+        }
+        Object content = ((Map<?, ?>) messageObj).get("content");
+        if (content == null) {
+            return null;
+        }
+        return content.toString().trim();
     }
 
     private static final List<Map.Entry<String, String>> LOCAL_KNOWLEDGE = new ArrayList<>();

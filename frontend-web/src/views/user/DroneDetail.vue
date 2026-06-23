@@ -294,15 +294,21 @@ const breadcrumbs = [
 
 // 获取图片完整URL
 const getImageUrl = (url) => {
-  if (!url) return 'https://picsum.photos/600/400'
+  if (!url) return ''
   if (url.startsWith('http')) return url
+  if (url.startsWith('/api/uploads/')) return url
+  if (url.startsWith('/uploads/')) return `/api${url}`
+  if (!url.startsWith('/')) return `/api/uploads/${url}`
   return `/api${url}`
 }
 
-// 获取头像URL
+// 获取头像URL（兼容多种路径格式）
 const getAvatarUrl = (url) => {
   if (!url) return ''
   if (url.startsWith('http')) return url
+  if (url.startsWith('/api/uploads/')) return url
+  if (url.startsWith('/uploads/')) return `/api${url}`
+  if (!url.startsWith('/')) return `/api/uploads/${url}`
   return `/api${url}`
 }
 

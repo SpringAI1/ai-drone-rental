@@ -26,4 +26,6 @@ public interface NotificationService extends IService<Notification> {
     void adminMarkAsRead(Long id);
 
     void adminMarkAllAsRead();
+
+    void adminClearAll();
 }

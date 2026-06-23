@@ -1,4 +1,4 @@
-import { get, put } from './request'
+import { get, put, del } from './request'
 
 export const getNotifications = (params) => {
   return get('/notification/list', params)
@@ -28,7 +28,12 @@ export const getAdminUnreadCount = () => {
 export const adminMarkAsRead = (id) => {
   return put(`/notification/admin/${id}/read`)
 }
-
+// 管理员-全部标记为已读
 export const adminMarkAllAsRead = () => {
   return put('/notification/admin/read-all')
+}
+
+// 管理员-一键清空所有通知
+export const adminClearNotifications = () => {
+  return del('/notification/admin/clear')
 }
