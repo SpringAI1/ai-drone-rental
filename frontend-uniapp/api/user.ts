@@ -59,7 +59,7 @@ export function changePassword(data: { oldPassword: string; newPassword: string 
 }
 
 export function recharge(amount: number) {
-  return post('/user/recharge', {}, { amount: amount })
+  return post('/user/recharge', { amount })
 }
 
 export function getQualification() {
