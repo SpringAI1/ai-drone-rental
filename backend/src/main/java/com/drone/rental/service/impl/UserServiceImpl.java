@@ -70,6 +70,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ResultCode.USER_DISABLED);
         }
 
+        if (user.getRole() != Constants.ROLE_USER) {
+            throw new BusinessException("此账号为管理员，请使用管理端登录");
+        }
+
         String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
 
         LoginVO vo = new LoginVO();
