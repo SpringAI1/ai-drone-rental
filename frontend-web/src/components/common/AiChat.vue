@@ -315,9 +315,21 @@ const formatTime = () => {
   return now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
+// HTML 转义：避免 AI 回复中潜在的 <script> 等危险标签被执行
+const escapeHtml = (text) => {
+  if (text === null || text === undefined) return ''
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 const formatMessage = (content) => {
   if (!content) return ''
-  let html = content
+  // 先转义所有 HTML 特殊字符（防 XSS），再把 markdown 标签替换为合法 HTML
+  let html = escapeHtml(content)
     .replace(/\n/g, '<br>')
     .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')

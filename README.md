@@ -165,6 +165,21 @@ npm run dev                    # → http://localhost:5173
 # 或运行到微信小程序 / Android / iOS
 ```
 
+**Uniapp 端默认调用真实后端**。如需切换到本地 mock 数据（demo / 离线开发）：
+
+```bash
+# 1. 复制模板
+cp frontend-uniapp/.env.example frontend-uniapp/.env.development
+
+# 2. 编辑 .env.development
+#   VITE_API_BASE_URL=http://<你的后端IP>:8080/api   # 真后端地址
+#   VITE_USE_MOCK=true                                # 走 mock，**不发 HTTP**
+```
+
+> ⚠️ 警告：`VITE_USE_MOCK=true` 会拦截所有请求并返回本地 mock，**不会调用真实后端**。生产部署请保持 `false`。
+
+> 📋 环境变量完整说明见 [frontend-uniapp/.env.example](frontend-uniapp/.env.example)
+
 ### 🔑 默认账号
 
 | 角色 | 账号 | 密码 | 说明 |

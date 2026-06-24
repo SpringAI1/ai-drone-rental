@@ -1,7 +1,26 @@
 import { mockStats, mockDrones, mockOrders, mockOrderStats, mockUserInfo, mockAirspaceRecords, mockNotifications, mockComments, mockBrands, mockTypes } from './mock'
 import { encryptRequest, decryptResponse, ENCRYPTION_ENABLED } from './encryption'
 
-export const BASE_URL = 'http://localhost:8080/api'
+// API 基础地址（支持 .env 配置，留空时使用相对路径）
+//   HBuilderX 运行时：可配置 .env.* 文件中的 UNI_API_BASE_URL
+//   CLI 构建时：可配置 .env.* 文件中的 VITE_API_BASE_URL
+//   优先级：UNI_API_BASE_URL > VITE_API_BASE_URL > 'http://localhost:8080/api'
+const API_BASE_URL =
+  (typeof process !== 'undefined' && (process as any)?.env?.UNI_API_BASE_URL) ||
+  (import.meta as any)?.env?.VITE_API_BASE_URL ||
+  'http://localhost:8080/api'
+export const BASE_URL = API_BASE_URL
+
+// Mock 模式开关：仅在显式开启时拦截请求并返回 mock 数据
+//   开启方式：.env.development / .env.production 中设置 VITE_USE_MOCK=true
+//   默认：false（走真实后端）
+//   警告：开启后所有接口都返回 mock，**不调用真实后端**
+const USE_MOCK: boolean =
+  String(
+    (typeof process !== 'undefined' && (process as any)?.env?.UNI_USE_MOCK) ||
+    (import.meta as any)?.env?.VITE_USE_MOCK ||
+    'false'
+  ).toLowerCase() === 'true'
 
 interface RequestOptions {
   url: string
@@ -113,7 +132,8 @@ function shouldEncrypt(options: RequestOptions): boolean {
 
 export function request<T = any>(options: RequestOptions): Promise<ResponseData<T>> {
   return new Promise(async (resolve, reject) => {
-    const mockResponse = buildMockResponse<T>(options.url, options.method || 'GET', options.data)
+    // 仅在显式开启 mock 模式时拦截
+    const mockResponse = USE_MOCK ? buildMockResponse<T>(options.url, options.method || 'GET', options.data) : null
 
     if (options.loading !== false) {
       uni.showLoading({ title: '加载中...', mask: true })
