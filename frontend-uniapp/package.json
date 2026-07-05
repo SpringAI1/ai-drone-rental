@@ -17,7 +17,7 @@
     "crypto-js": "^4.2.0",
     "jsencrypt": "^3.3.2",
     "pinia": "^2.1.7",
-    "vue": "3.2.47"
+    "vue": "~3.3.13"
   },
   "devDependencies": {
     "@dcloudio/types": "^3.4.8",

@@ -1,12 +1,16 @@
 package com.drone.rental.ai.rag;
 
+import com.drone.rental.ai.vector.SimpleVectorStore;
+import com.drone.rental.entity.KbChunk;
+import com.drone.rental.entity.KbDocument;
+import com.drone.rental.mapper.KbChunkMapper;
+import com.drone.rental.mapper.KbDocumentMapper;
+import com.drone.rental.security.UserContext;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
-import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
@@ -20,25 +24,25 @@ import java.util.List;
 /**
  * RAG 知识库服务
  *
- * 真实向量检索式 RAG：
- * 1) 启动时加载 classpath:knowledge-base/ 下的所有 .txt
- * 2) TokenTextSplitter 切块（每块约 300 tokens）
- * 3) 手动 embedding 分批写入（Qwen 限流 ≤ 10/批）
- * 4) similaritySearch 找到最相关的 top-K
+ * 1) 启动时把 classpath:knowledge-base/*.txt 写入 SQLite + SimpleVectorStore（scope=public, userId=0）
+ *    重复启动会自动跳过已存在的文件
+ * 2) 用户上传的文档（私有/公共）由 KbDocumentService 处理，本类只负责检索
+ * 3) 检索时按当前 userId 过滤：公共 + 当前用户私有
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class RagService {
 
-    private final VectorStore vectorStore;
+    private final SimpleVectorStore vectorStore;
+    private final KbDocumentMapper kbDocumentMapper;
+    private final KbChunkMapper kbChunkMapper;
 
-    @Value("classpath:knowledge-base/*.txt")
+    @org.springframework.beans.factory.annotation.Value("classpath:knowledge-base/*.txt")
     private Resource[] knowledgeFiles;
 
-    private static final String KNOWLEDGE_PREFIX = "drone-kb:";
-    /** Qwen embedding API 单次请求最多 10 条 */
-    private static final int BATCH_SIZE = 10;
+    private static final long KB_SYSTEM_USER_ID = 0L;     // 系统内置
+    private static final int BATCH_SIZE = 10;             // Qwen embedding API 单次 ≤10
 
     @PostConstruct
     public void init() {
@@ -47,39 +51,58 @@ public class RagService {
                 ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
                 knowledgeFiles = resolver.getResources("classpath:knowledge-base/*.txt");
             }
-            log.info("[RAG] 知识库文件数: {}", knowledgeFiles.length);
+            log.info("[RAG] 系统知识库文件数: {}", knowledgeFiles.length);
 
-            List<Document> all = new ArrayList<>();
             for (Resource res : knowledgeFiles) {
                 String filename = res.getFilename();
                 if (filename == null) continue;
-                String text = new String(res.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                Document doc = new Document(KNOWLEDGE_PREFIX + filename, text,
-                        java.util.Map.of("source", filename, "type", "drone-knowledge"));
-                all.add(doc);
-                log.info("[RAG] 加载知识: {} ({} 字符)", filename, text.length());
-            }
-            // 切块
-            TokenTextSplitter splitter = new TokenTextSplitter(300, 50, 5, 10000, true);
-            List<Document> chunks = splitter.apply(all);
-            log.info("[RAG] 切块完成: {} 个文档 → {} 个 chunks", all.size(), chunks.size());
 
-            // 分批写入向量库（Qwen embedding API 限流 ≤ 10/批）
-            if (!chunks.isEmpty()) {
-                int total = 0;
-                for (int i = 0; i < chunks.size(); i += BATCH_SIZE) {
-                    int end = Math.min(i + BATCH_SIZE, chunks.size());
-                    List<Document> batch = new ArrayList<>(chunks.subList(i, end));
-                    try {
-                        vectorStore.add(batch);  // 内部自动 embedding（每批 ≤ 10 避免限流）
-                        total += batch.size();
-                        log.info("[RAG] 批次 {}-{} 写入完成", i, end);
-                    } catch (Exception e) {
-                        log.warn("[RAG] 批次 {}-{} 失败: {}", i, end, e.getMessage());
-                    }
+                // 重复启动：检查是否已存在
+                KbDocument exist = kbDocumentMapper.findAllReady().stream()
+                        .filter(d -> KB_SYSTEM_USER_ID == d.getUserId() && filename.equals(d.getFilename()))
+                        .findFirst().orElse(null);
+                if (exist != null) {
+                    log.info("[RAG] 系统知识 {} 已存在（id={}），跳过", filename, exist.getId());
+                    continue;
                 }
-                log.info("[RAG] ✅ 知识库初始化完成，向量库共写入 {} 个 chunk", total);
+
+                String text = new String(res.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                KbDocument doc = new KbDocument();
+                doc.setUserId(KB_SYSTEM_USER_ID);
+                doc.setScope("public");
+                doc.setFilename(filename);
+                doc.setFileType("txt");
+                doc.setFileSize((long) text.length());
+                doc.setFilePath("classpath:knowledge-base/" + filename);
+                doc.setStatus(0);
+                kbDocumentMapper.insert(doc);
+
+                // 切块
+                List<Document> rawList = List.of(new Document(
+                        "sys:" + doc.getId(), text,
+                        java.util.Map.of("source", filename, "type", "drone-knowledge")));
+                TokenTextSplitter splitter = new TokenTextSplitter(300, 50, 5, 10000, true);
+                List<Document> chunks = splitter.apply(rawList);
+                log.info("[RAG] 系统知识 {} 切块: {} 块", filename, chunks.size());
+
+                // 转 KbChunk 并写入
+                List<KbChunk> kchunks = new ArrayList<>();
+                for (int i = 0; i < chunks.size(); i++) {
+                    Document c = chunks.get(i);
+                    KbChunk kc = new KbChunk();
+                    kc.setDocumentId(doc.getId());
+                    kc.setChunkIndex(i);
+                    kc.setChunkText(c.getText());
+                    kchunks.add(kc);
+                }
+                vectorStore.addWithPersistence(kchunks, doc);
+
+                doc.setChunkCount(kchunks.size());
+                doc.setCharCount(text.length());
+                doc.setStatus(1);
+                kbDocumentMapper.updateById(doc);
             }
+            log.info("[RAG] 系统知识库初始化完成，stats: {}", vectorStore.stats());
         } catch (IOException e) {
             log.error("[RAG] 加载知识库失败", e);
         } catch (Exception e) {
@@ -88,22 +111,15 @@ public class RagService {
     }
 
     /**
-     * 语义检索：根据用户问题从知识库找出最相关的 K 个片段
+     * 语义检索：按当前用户可见性过滤
+     * @param query 查询
+     * @param topK  topK
      */
     public List<Document> search(String query, int topK) {
         if (query == null || query.isBlank()) return List.of();
-        try {
-            return vectorStore.similaritySearch(
-                    org.springframework.ai.vectorstore.SearchRequest.builder()
-                            .query(query)
-                            .topK(topK)
-                            .similarityThreshold(0.4)
-                            .build()
-            );
-        } catch (Exception e) {
-            log.warn("[RAG] 检索失败: {}", e.getMessage());
-            return List.of();
-        }
+        Long userId = null;
+        try { userId = UserContext.getCurrentUserId(); } catch (Exception ignored) {}
+        return vectorStore.search(query, topK > 0 ? topK : 4, userId);
     }
 
     /**
@@ -114,9 +130,14 @@ public class RagService {
         StringBuilder sb = new StringBuilder("【知识库参考】\n");
         int i = 1;
         for (Document d : docs) {
-            sb.append("[").append(i++).append("] 来源：").append(d.getMetadata().get("source"))
+            sb.append("[").append(i++).append("] 来源：")
+              .append(d.getMetadata().get("source"))
               .append("\n").append(d.getText()).append("\n\n");
         }
         return sb.toString();
+    }
+
+    public SimpleVectorStore getVectorStore() {
+        return vectorStore;
     }
 }

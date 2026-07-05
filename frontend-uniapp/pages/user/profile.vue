@@ -282,6 +282,8 @@ const handleFeatureClick = (item: FeatureItem) => {
     uni.navigateTo({ url: '/pages/orders/comment?type=my' })
   } else if (item.action === 'qualification') {
     uni.navigateTo({ url: '/pages/qualification/index' })
+  } else if (item.action === 'knowledge') {
+    uni.navigateTo({ url: '/pages/knowledge/list' })
   }
 }
 

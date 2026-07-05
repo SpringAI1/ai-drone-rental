@@ -103,24 +103,38 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         Page<Comment> commentPage = this.page(page, wrapper);
         Page<CommentVO> voPage = new Page<>(pageNum, pageSize);
         voPage.setTotal(commentPage.getTotal());
-        
-        List<CommentVO> voList = commentPage.getRecords().stream()
-                .map(this::convertToVO)
+
+        List<Comment> records = commentPage.getRecords();
+
+        // 批量加载用户信息，避免 N+1
+        java.util.Set<Long> userIds = new java.util.HashSet<>();
+        for (Comment c : records) { if (c.getUserId() != null) userIds.add(c.getUserId()); }
+        java.util.Map<Long, User> userMap = userIds.isEmpty() ? java.util.Collections.emptyMap() :
+                userService.listByIds(userIds).stream().collect(Collectors.toMap(User::getId, u -> u));
+
+        List<CommentVO> voList = records.stream()
+                .map(c -> convertToVO(c, userMap, null))
                 .collect(Collectors.toList());
-        
+
         // 为每个一级评论获取子评论
         for (CommentVO vo : voList) {
             List<Comment> childComments = this.list(new LambdaQueryWrapper<Comment>()
                     .eq(Comment::getParentId, vo.getId())
                     .eq(Comment::getStatus, Constants.COMMENT_STATUS_NORMAL)
                     .orderByAsc(Comment::getCreatedTime));
-            
+
+            // 子评论也批量加载用户信息
+            java.util.Set<Long> childUserIds = new java.util.HashSet<>();
+            for (Comment c : childComments) { if (c.getUserId() != null) childUserIds.add(c.getUserId()); }
+            java.util.Map<Long, User> childUserMap = childUserIds.isEmpty() ? userMap :
+                    userService.listByIds(childUserIds).stream().collect(Collectors.toMap(User::getId, u -> u));
+
             List<CommentVO> childVOs = childComments.stream()
-                    .map(this::convertToVO)
+                    .map(c -> convertToVO(c, childUserMap, null))
                     .collect(Collectors.toList());
             vo.setChildren(childVOs);
         }
-        
+
         voPage.setRecords(voList);
 
         return voPage;
@@ -147,19 +161,41 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
                                             String userName, String droneModel, Integer rating, Boolean hasReply) {
         IPage<Comment> commentPage = pageComments(pageNum, pageSize, droneId, status, userName, droneModel, rating, hasReply);
 
+        List<Comment> records = commentPage.getRecords();
+
+        // 批量加载用户信息，避免 N+1
+        java.util.Set<Long> userIds = new java.util.HashSet<>();
+        for (Comment c : records) { if (c.getUserId() != null) userIds.add(c.getUserId()); }
+        java.util.Map<Long, User> userMap = userIds.isEmpty() ? java.util.Collections.emptyMap() :
+                userService.listByIds(userIds).stream().collect(Collectors.toMap(User::getId, u -> u));
+
+        // 批量加载无人机信息
+        java.util.Set<Long> droneIds = new java.util.HashSet<>();
+        for (Comment c : records) { if (c.getDroneId() != null) droneIds.add(c.getDroneId()); }
+        java.util.Map<Long, Drone> droneMap = droneIds.isEmpty() ? java.util.Collections.emptyMap() :
+                droneService.listByIds(droneIds).stream().collect(Collectors.toMap(Drone::getId, d -> d));
+
         Page<CommentVO> voPage = new Page<>(pageNum, pageSize);
         voPage.setTotal(commentPage.getTotal());
-        voPage.setRecords(commentPage.getRecords().stream()
-                .map(this::convertToVO)
+        voPage.setRecords(records.stream()
+                .map(c -> convertToVO(c, userMap, droneMap))
                 .collect(Collectors.toList()));
 
         return voPage;
     }
 
     /**
-     * 将Comment转换为CommentVO
+     * 将Comment转换为CommentVO（批量加载版本）
      */
     private CommentVO convertToVO(Comment comment) {
+        return convertToVO(comment, null, null);
+    }
+
+    /**
+     * 将Comment转换为CommentVO（预加载用户/设备信息，避免 N+1）
+     */
+    private CommentVO convertToVO(Comment comment, java.util.Map<Long, User> userMap,
+                                   java.util.Map<Long, Drone> droneMap) {
         CommentVO vo = new CommentVO();
         vo.setId(comment.getId());
         vo.setUserId(comment.getUserId());
@@ -174,18 +210,18 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         vo.setReplyTime(comment.getReplyTime());
         vo.setCreateTime(comment.getCreatedTime());
 
-        // 获取用户信息
+        // 获取用户信息 - 优先从预加载 Map 取
         if (comment.getUserId() != null) {
-            User user = userService.getById(comment.getUserId());
+            User user = userMap != null ? userMap.get(comment.getUserId()) : userService.getById(comment.getUserId());
             if (user != null) {
                 vo.setUserNickname(user.getNickname() != null ? user.getNickname() : user.getUsername());
                 vo.setUserAvatar(user.getAvatar());
             }
         }
 
-        // 获取无人机信息
+        // 获取无人机信息 - 优先从预加载 Map 取
         if (comment.getDroneId() != null) {
-            Drone drone = droneService.getById(comment.getDroneId());
+            Drone drone = droneMap != null ? droneMap.get(comment.getDroneId()) : droneService.getById(comment.getDroneId());
             if (drone != null) {
                 vo.setDroneModel(drone.getModel());
                 vo.setDroneImage(drone.getImage());

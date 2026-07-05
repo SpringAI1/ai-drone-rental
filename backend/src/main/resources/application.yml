@@ -10,7 +10,7 @@ spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: org.sqlite.JDBC
-    url: jdbc:sqlite:drone_rental.db
+    url: jdbc:sqlite:${SQLITE_PATH:drone_rental.db}
     druid:
       initial-size: 10
       min-idle: 5
@@ -43,8 +43,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 20MB
+      max-file-size: 50MB
+      max-request-size: 100MB
 
   data:
     redis:
@@ -61,8 +61,8 @@ spring:
 
   ai:
     openai:
-      # API Key：本地开发直接写死；生产部署请改为环境变量或密钥管理
-      api-key: sk-your-dashscope-api-key-here
+      # API Key：通义千问 DashScope（本地开发直接使用，生产环境通过环境变量注入）
+      api-key: ${DASHSCOPE_API_KEY:sk-your-dashscope-api-key-here}
       base-url: https://dashscope.aliyuncs.com/compatible-mode
       chat:
         options:
@@ -92,8 +92,8 @@ spring:
         version: 1.0.0
         type: SYNC
         sse-endpoint: /mcp/sse
-        # 允许的 MCP 客户端来源（本地开发放行所有来源；生产部署时改为具体域名）
-        allowed-origins: "*"
+        # 允许的 MCP 客户端来源（生产部署时必须改为具体客户端域名，不要用 *）
+        allowed-origins: ${MCP_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:8080}
 
 # CORS 跨域白名单：包含 Web（Vite 5173/5174）、H5（uni-app 3000）、后端（8080）
 # 本地开发直接放行本地所有端口；生产部署时改为具体域名，多个用逗号分隔
@@ -113,16 +113,15 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 
 jwt:
-  # JWT 签名密钥（本地开发默认值；生产部署请改为强随机字符串）
-  secret: your-jwt-secret-here
+  # JWT 签名密钥（通过环境变量 JWT_SECRET 注入，本地开发可设默认值；生产部署请改为强随机字符串）
+  secret: ${JWT_SECRET:your-jwt-secret-here}
   expiration: 86400000
   header: Authorization
   prefix: Bearer
 
 springdoc:
-  api-docs:
-    enabled: true
-    path: /api-docs
+  enabled: true
+  path: /api-docs
   swagger-ui:
     enabled: true
     path: /swagger-ui/index.html

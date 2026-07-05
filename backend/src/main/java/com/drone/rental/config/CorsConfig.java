@@ -26,13 +26,13 @@ public class CorsConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        // 精确白名单（避免和 allowCredentials=true 配合时的 "*" 冲突）
+        // 精确白名单（和 allowCredentials=true 配合时不允许 "*" 也不使用 allowOriginPatterns）
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .toList();
         config.setAllowedOrigins(origins);
-        config.setAllowedOriginPatterns(origins); // 同时支持 pattern 以便子域
+        // 移除 setAllowedOriginPatterns：与 allowCredentials=true 共存时存在安全风险
         // 允许所有请求头
         config.addAllowedHeader("*");
         // 允许的请求方法（不放行 *，更显式）

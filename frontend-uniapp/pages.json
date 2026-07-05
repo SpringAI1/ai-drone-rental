@@ -101,6 +101,24 @@
 			"style": {
 				"navigationBarTitleText": "飞行资质"
 			}
+		},
+		{
+			"path": "pages/knowledge/list",
+			"style": {
+				"navigationBarTitleText": "AI 知识库"
+			}
+		},
+		{
+			"path": "pages/knowledge/upload",
+			"style": {
+				"navigationBarTitleText": "上传文档"
+			}
+		},
+		{
+			"path": "pages/knowledge/detail",
+			"style": {
+				"navigationBarTitleText": "文档详情"
+			}
 		}
 	],
 	"globalStyle": {

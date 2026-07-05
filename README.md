@@ -37,7 +37,8 @@
 | 🔔 **WebSocket 实时通知** | 订单 / 评论 / 故障 / 空域备案多端实时推送，HandshakeInterceptor 解决 token 丢失 |
 | 🛠 **Spring AI Agent** | 工具调用：无人机推荐 / 订单查询 / 维修记录查询 |
 | 📱 **三端同源** | Web 端 + Uniapp（H5 / 微信小程序 / App）共用同一套后端 API |
-| 📊 **管理后台** | 仪表盘 / 订单 / 设备 / 用户 / 资质 / 维保 / AI 对话审计全覆盖 |
+| 📚 **知识库管理** | 支持上传 PDF/Word/PPT/Excel/TXT/MD，自动解析、切块、向量化 |
+| 📊 **管理后台** | 仪表盘 / 订单 / 设备 / 用户 / 资质 / 维保 / AI 对话审计 / 知识库管理全覆盖 |
 | 👤 **双端个人中心** | 用户 + 管理员均可修改头像 / 资料 / 密码，下拉菜单直达 |
 | 🔐 **JWT 鉴权** | 角色分级（USER / ADMIN），管理员 + 用户双登录入口 |
 | 💾 **Redis 缓存** | 首页统计 / 无人机列表 / 用户信息，多态类型序列化解决 IPage 反序列化 |
@@ -154,7 +155,7 @@ mvn spring-boot:run            # → http://localhost:8080/api
 ```bash
 cd frontend-web
 npm install
-npm run dev                    # → http://localhost:5173
+npm run dev                    # → http://localhost:3000
 ```
 
 ### 4. 启动 Uniapp 端（可选）
@@ -309,14 +310,14 @@ ws://localhost:8080/api/ws/orders?token=<JWT>
 
 | 模块 | 入口 |
 |------|------|
-| 用户端首页 | `http://localhost:5173/` |
-| 用户登录 | `http://localhost:5173/login` |
-| 用户注册 | `http://localhost:5173/register` |
-| 用户个人中心 | `http://localhost:5173/profile` |
-| 无人机列表 | `http://localhost:5173/drones` |
-| 管理端登录 | `http://localhost:5173/admin/login` |
-| 管理端仪表盘 | `http://localhost:5173/admin/dashboard` |
-| 管理端个人中心 | `http://localhost:5173/admin/profile` |
+| 用户端首页 | `http://localhost:3000/` |
+| 用户登录 | `http://localhost:3000/login` |
+| 用户注册 | `http://localhost:3000/register` |
+| 用户个人中心 | `http://localhost:3000/profile` |
+| 无人机列表 | `http://localhost:3000/drones` |
+| 管理端登录 | `http://localhost:3000/admin/login` |
+| 管理端仪表盘 | `http://localhost:3000/admin/dashboard` |
+| 管理端个人中心 | `http://localhost:3000/admin/profile` |
 | Swagger 文档 | `http://localhost:8080/api/swagger-ui/index.html` |
 
 ---
@@ -338,7 +339,102 @@ ws://localhost:8080/api/ws/orders?token=<JWT>
 - ✅ **105/105** E2E 测试通过（注册 / 登录 / 资质 / 订单 / 评价 / 报修 / 维修 / 空域 / 通知 / WS / 缓存 / 三端 / 个人中心）
 - ✅ 关键路径：WebSocket 0 重连 · Redis 缓存命中毫秒级 · IPage 反序列化无 500
 - ✅ 跨端：Uniapp 与 Web 共用同一套后端 API
-- ✅ 安全：CORS 精确白名单 · MD5 密码哈希 · JWT 鉴权 + Admin 拦截器
+- ✅ 安全：CORS 精确白名单 · BCrypt 密码哈希（自动兼容旧 MD5） · JWT 鉴权 + Admin 拦截器 · 登录速率限制
+
+---
+
+## 🖥 云服务器部署
+
+### 后端部署
+
+```bash
+# 1. 打包
+cd backend
+mvn clean package -DskipTests
+# 产物：target/drone-rental-1.0.0.jar
+
+# 2. 上传到服务器
+scp target/drone-rental-1.0.0.jar root@<服务器IP>:/opt/drone-rental/
+
+# 3. 服务器上启动
+# 环境变量（替换为实际值）
+export DASHSCOPE_API_KEY=sk-your-key-here
+export JWT_SECRET=your-random-secret-string
+export SQLITE_PATH=/opt/drone-rental/drone_rental.db
+export REDIS_HOST=localhost
+
+nohup java -jar /opt/drone-rental/drone-rental-1.0.0.jar > /opt/drone-rental/app.log 2>&1 &
+```
+
+### 前端部署（Nginx）
+
+```bash
+# 1. 打包
+cd frontend-web
+npm run build
+# 产物：dist/
+
+# 2. 上传到服务器
+scp -r dist/* root@<服务器IP>:/var/www/drone-rental/
+
+# 3. Nginx 配置（/etc/nginx/conf.d/drone-rental.conf）
+```
+
+```nginx
+server {
+    listen 80;
+    server_name <你的域名或IP>;
+
+    # 前端静态文件
+    root /var/www/drone-rental;
+    index index.html;
+
+    # Vue Router history 模式
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # API 反向代理到后端
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 上传文件代理
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:8080;
+    }
+
+    # WebSocket 代理（通知推送）
+    location /api/ws/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+
+    # Gzip 压缩
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 256;
+}
+```
+
+```bash
+# 4. 重载 Nginx
+nginx -t && nginx -s reload
+```
+
+### Docker 快速部署（推荐）
+
+```bash
+# docker-compose.yml 见仓库根目录
+docker-compose up -d
+```
 
 ---
 

@@ -47,7 +47,8 @@ public class EncryptionFilter implements Filter {
         // 公开接口（/public/**）、文件上传、OPTIONS、Swagger 跳过加密
         String uri = httpRequest.getRequestURI();
         String method = httpRequest.getMethod();
-        if (isSkipEncryption(uri, method)) {
+        String contentType = httpRequest.getContentType();
+        if (isSkipEncryption(uri, method, contentType)) {
             chain.doFilter(request, response);
             return;
         }
@@ -113,7 +114,7 @@ public class EncryptionFilter implements Filter {
     /**
      * 判断是否跳过加密
      */
-    private boolean isSkipEncryption(String uri, String method) {
+    private boolean isSkipEncryption(String uri, String method, String contentType) {
         if ("OPTIONS".equalsIgnoreCase(method)) return true;
         if (uri == null) return true;
 
@@ -121,7 +122,9 @@ public class EncryptionFilter implements Filter {
         if (uri.contains("/public/")) return true;
 
         // 文件上传：multipart/form-data 不做 JSON 加密
-        if (uri.contains("/common/upload") || uri.contains("/uploads/")) return true;
+        if (contentType != null && contentType.toLowerCase().contains("multipart/form-data")) return true;
+        if (uri.contains("/common/upload") || uri.contains("/uploads/")
+                || uri.contains("/knowledge/upload")) return true;
 
         // Swagger / OpenAPI 文档
         if (uri.contains("/v3/api-docs") || uri.contains("/swagger-ui/")

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onLaunch } from '@dcloudio/uni-app'
 
-	onLaunch(() => {
-		// 应用启动钩子（保留用于未来扩展）
-	})
+onLaunch(() => {
+  // 应用启动钩子（保留用于未来扩展）
+})
 </script>
 
 <style lang="scss">

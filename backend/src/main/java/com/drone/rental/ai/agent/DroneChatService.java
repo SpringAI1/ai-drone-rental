@@ -43,6 +43,9 @@ public class DroneChatService {
 
     private final java.util.Map<String, ChatMemory> memoryMap = new java.util.concurrent.ConcurrentHashMap<>();
 
+    /** 最大会话数，超过后清理最早未使用的 */
+    private static final int MAX_CONVERSATIONS = 1000;
+
     private static final String SYSTEM_PROMPT = """
             你是「翱翔无人机租赁平台」的 AI 智能客服，名字叫"小飞"。
             你专精于民用无人机租赁领域，熟悉中国民航局相关法规、各机型参数、空域申请、保险规则。
@@ -57,6 +60,16 @@ public class DroneChatService {
             """;
 
     private ChatMemory memoryFor(String conversationId) {
+        // 防止内存泄漏：超过上限时清理一半旧会话
+        if (memoryMap.size() >= MAX_CONVERSATIONS) {
+            int toRemove = MAX_CONVERSATIONS / 2;
+            java.util.Iterator<String> it = memoryMap.keySet().iterator();
+            for (int i = 0; i < toRemove && it.hasNext(); i++) {
+                it.next();
+                it.remove();
+            }
+            log.warn("[AI] ChatMemory 会话数达到上限，清理 {} 个旧会话", toRemove);
+        }
         return memoryMap.computeIfAbsent(conversationId, k -> new InMemoryChatMemory());
     }
 
