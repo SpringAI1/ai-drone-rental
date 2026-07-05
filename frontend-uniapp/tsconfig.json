@@ -16,8 +16,9 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "types": ["@dcloudio/types"]
+    "types": ["@dcloudio/types"],
+    "ignoreDeprecations": "5.0"
   },
-  "include": ["**/*.ts", "**/*.tsx", "**/*.vue", "**/*.uvue", "**/*.uts"],
+  "include": ["env.d.ts", "**/*.ts", "**/*.tsx", "**/*.vue", "**/*.uvue", "**/*.uts"],
   "exclude": ["node_modules", "unpackage", "dist"]
 }

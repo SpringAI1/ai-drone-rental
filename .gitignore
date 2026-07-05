@@ -122,5 +122,9 @@ PROFILE_README.md
 /drone_rental.db
 /drone_rental.db.bak
 /backend/tmp/
+/dump.rdb
+
+# UniApp 前端编译产物
+frontend-uniapp/dist/
 
 # 结束

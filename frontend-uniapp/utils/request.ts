@@ -97,7 +97,8 @@ export function request<T = any>(options: RequestOptions): Promise<ResponseData<
           uni.redirectTo({ url: '/pages/user/login' })
           reject(response)
         } else {
-          resolve(response)
+          // 非 200 响应统一 reject，让调用方处理错误
+          reject(response)
         }
       },
       fail: (err) => {

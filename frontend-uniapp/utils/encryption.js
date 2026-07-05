@@ -16,11 +16,20 @@
 import CryptoJS from 'crypto-js'
 import { JSEncrypt } from 'jsencrypt'
 
+import { BASE_URL } from './request'
+// 降级默认值（与 request.ts 保持一致）
+const FALLBACK_BASE_URL = 'http://localhost:8080/api'
+
 let cachedPublicKey = null
 let currentAesKey = null
 let fetchingPromise = null
 
-const BASE_URL = 'http://localhost:8080/api'
+/**
+ * 获取 API 基础地址
+ */
+function getBaseUrl() {
+  try { return BASE_URL } catch (e) { return FALLBACK_BASE_URL }
+}
 
 /**
  * 获取 RSA 公钥（uniapp 专用，走 uni.request）
@@ -31,7 +40,7 @@ export async function getPublicKey(force = false) {
 
   fetchingPromise = new Promise((resolve, reject) => {
     uni.request({
-      url: BASE_URL + '/public/rsa-key',
+      url: getBaseUrl() + '/public/rsa-key',
       method: 'GET',
       success: (res) => {
         const json = res.data

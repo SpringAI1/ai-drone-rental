@@ -199,12 +199,19 @@ public class AdminDashboardController {
 
     @Cacheable(value = "popularDrones", key = "#limit")
     public List<Map<String, Object>> loadPopularDrones(Integer limit) {
+        // 安全校验：限制 limit 范围防止 SQL 注入和异常查询
+        if (limit == null || limit < 1) limit = 5;
+        if (limit > 100) limit = 100;
+
         List<Map<String, Object>> list = new ArrayList<>();
 
-        List<Drone> drones = droneMapper.selectList(new LambdaQueryWrapper<Drone>()
+        // 使用 MyBatis Plus 分页替代 .last("LIMIT ...")，避免 SQL 注入
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<Drone> page =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, limit);
+        droneMapper.selectPage(page, new LambdaQueryWrapper<Drone>()
                 .eq(Drone::getDeleted, 0)
-                .eq(Drone::getOnShelf, 1)
-                .last("LIMIT " + limit));
+                .eq(Drone::getOnShelf, 1));
+        List<Drone> drones = page.getRecords();
 
         if (drones.isEmpty()) {
             return list;
@@ -240,11 +247,18 @@ public class AdminDashboardController {
 
     @Cacheable(value = "recentOrders", key = "#limit")
     public List<Map<String, Object>> loadRecentOrders(Integer limit) {
+        // 安全校验：限制 limit 范围防止 SQL 注入和异常查询
+        if (limit == null || limit < 1) limit = 5;
+        if (limit > 100) limit = 100;
+
         List<Map<String, Object>> list = new ArrayList<>();
 
-        List<RentalOrder> orders = orderMapper.selectList(new LambdaQueryWrapper<RentalOrder>()
-                .orderByDesc(RentalOrder::getCreatedTime)
-                .last("LIMIT " + limit));
+        // 使用 MyBatis Plus 分页替代 .last("LIMIT ...")，避免 SQL 注入
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<RentalOrder> page =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, limit);
+        orderMapper.selectPage(page, new LambdaQueryWrapper<RentalOrder>()
+                .orderByDesc(RentalOrder::getCreatedTime));
+        List<RentalOrder> orders = page.getRecords();
 
         if (orders.isEmpty()) {
             return list;

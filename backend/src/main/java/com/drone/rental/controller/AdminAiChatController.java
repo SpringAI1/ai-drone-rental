@@ -17,7 +17,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * AI 对话审计 — 管理端查看用户与 AI 的对话记录，用于反向优化本地知识库
@@ -31,7 +30,7 @@ public class AdminAiChatController {
     private final AiChatMessageService aiChatMessageService;
 
     /**
-     * 获取会话列表（按会话聚合）
+     * 获取会话列表（按会话聚合，数据库层分页 + 聚合）
      */
     @Operation(summary = "获取会话列表（分页 + 聚合）")
     @GetMapping("/conversations")
@@ -41,87 +40,34 @@ public class AdminAiChatController {
             @Parameter(description = "搜索关键字（匹配消息内容）") @RequestParam(required = false) String keyword,
             @Parameter(description = "是否只看有用户的（过滤匿名）") @RequestParam(required = false) Boolean withUserOnly) {
 
-        List<AiChatMessage> all = aiChatMessageService.list();
-        if (all == null) all = new ArrayList<>();
+        // 安全校验
+        if (pageNum == null || pageNum < 1) pageNum = 1;
+        if (pageSize == null || pageSize < 1) pageSize = 10;
+        if (pageSize > 100) pageSize = 100;
 
-        // 按 conversationId 聚合
-        Map<String, List<AiChatMessage>> byConv = all.stream()
-                .collect(Collectors.groupingBy(AiChatMessage::getConversationId));
+        int offset = (pageNum - 1) * pageSize;
+
+        // 数据库层聚合 + 分页，不再全表加载到内存
+        List<Map<String, Object>> summaries = aiChatMessageService.getConversationSummaries(
+                keyword, withUserOnly, offset, pageSize);
+        long total = aiChatMessageService.countConversations(keyword, withUserOnly);
 
         List<Map<String, Object>> convs = new ArrayList<>();
-        for (Map.Entry<String, List<AiChatMessage>> e : byConv.entrySet()) {
-            List<AiChatMessage> msgs = e.getValue();
-            if (msgs == null || msgs.isEmpty()) continue;
-
-            LocalDateTime first = msgs.stream()
-                    .map(AiChatMessage::getCreatedTime)
-                    .filter(java.util.Objects::nonNull)
-                    .min(LocalDateTime::compareTo)
-                    .orElse(null);
-            LocalDateTime last = msgs.stream()
-                    .map(AiChatMessage::getCreatedTime)
-                    .filter(java.util.Objects::nonNull)
-                    .max(LocalDateTime::compareTo)
-                    .orElse(null);
-
-            Long userId = msgs.stream()
-                    .map(AiChatMessage::getUserId)
-                    .filter(java.util.Objects::nonNull)
-                    .findFirst()
-                    .orElse(null);
-
-            // 取第一条用户消息作为"问题"摘要
-            String firstUserMsg = msgs.stream()
-                    .filter(m -> "user".equals(m.getRole()))
-                    .sorted(Comparator.comparing(AiChatMessage::getCreatedTime))
-                    .map(AiChatMessage::getContent)
-                    .findFirst()
-                    .orElse("");
-
-            // 如果有关键字筛选：整条会话中是否有任何消息含关键字
-            if (keyword != null && !keyword.trim().isEmpty()) {
-                boolean hit = msgs.stream()
-                        .anyMatch(m -> m.getContent() != null && m.getContent().contains(keyword));
-                if (!hit) continue;
-            }
-
-            // 过滤：只看已登录用户
-            if (Boolean.TRUE.equals(withUserOnly) && userId == null) continue;
-
-            long userCount = msgs.stream().filter(m -> "user".equals(m.getRole())).count();
-            long aiCount = msgs.stream().filter(m -> "ai".equals(m.getRole())).count();
-
+        for (Map<String, Object> row : summaries) {
             Map<String, Object> conv = new HashMap<>();
-            conv.put("conversationId", e.getKey());
-            conv.put("userId", userId);
-            conv.put("firstMessage", truncate(firstUserMsg, 60));
-            conv.put("messageCount", msgs.size());
-            conv.put("userMessageCount", userCount);
-            conv.put("aiMessageCount", aiCount);
-            conv.put("firstTime", first);
-            conv.put("lastTime", last);
-
+            conv.put("conversationId", row.get("conversation_id"));
+            conv.put("userId", row.get("user_id"));
+            conv.put("messageCount", row.get("message_count"));
+            conv.put("userMessageCount", row.get("user_message_count"));
+            conv.put("aiMessageCount", row.get("ai_message_count"));
+            conv.put("firstTime", row.get("first_time"));
+            conv.put("lastTime", row.get("last_time"));
+            conv.put("firstMessage", ""); // 详情页再加载首条消息
             convs.add(conv);
         }
 
-        // 按最后活跃时间倒序
-        convs.sort((a, b) -> {
-            LocalDateTime la = (LocalDateTime) a.get("lastTime");
-            LocalDateTime lb = (LocalDateTime) b.get("lastTime");
-            if (la == null && lb == null) return 0;
-            if (la == null) return 1;
-            if (lb == null) return -1;
-            return lb.compareTo(la);
-        });
-
-        // 手动分页
-        int total = convs.size();
-        int start = (pageNum - 1) * pageSize;
-        int end = Math.min(start + pageSize, total);
-        List<Map<String, Object>> pageRecords = (start < total) ? convs.subList(start, end) : new ArrayList<>();
-
         IPage<Map<String, Object>> page = new Page<>(pageNum, pageSize, total);
-        page.setRecords(pageRecords);
+        page.setRecords(convs);
 
         return Result.success(page);
     }
@@ -186,36 +132,32 @@ public class AdminAiChatController {
     }
 
     /**
-     * 获取整体统计（用于仪表盘/顶部汇总）
+     * 获取整体统计（用于仪表盘/顶部汇总），数据库层聚合不加载消息体
      */
     @Operation(summary = "获取对话统计")
     @GetMapping("/stats")
     public Result<Map<String, Object>> getStats() {
-        List<AiChatMessage> all = aiChatMessageService.list();
-        if (all == null) all = new ArrayList<>();
+        java.util.Map<String, Object> stats = aiChatMessageService.getMessageStats();
+        if (stats == null) stats = new HashMap<>();
 
-        long totalMessages = all.size();
-        long totalUserMessages = all.stream().filter(m -> "user".equals(m.getRole())).count();
-        long totalSessions = all.stream()
-                .map(AiChatMessage::getConversationId)
-                .filter(java.util.Objects::nonNull)
-                .distinct()
-                .count();
-        long userCount = all.stream()
-                .map(AiChatMessage::getUserId)
-                .filter(java.util.Objects::nonNull)
-                .distinct()
-                .count();
+        // 补充计算字段
+        long totalMessages = stats.get("total_messages") instanceof Number
+                ? ((Number) stats.get("total_messages")).longValue() : 0;
+        long totalUserMessages = stats.get("total_user_messages") instanceof Number
+                ? ((Number) stats.get("total_user_messages")).longValue() : 0;
+        long totalSessions = stats.get("total_sessions") instanceof Number
+                ? ((Number) stats.get("total_sessions")).longValue() : 0;
 
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalMessages", totalMessages);
-        stats.put("totalUserMessages", totalUserMessages);
-        stats.put("totalAiMessages", totalMessages - totalUserMessages);
-        stats.put("totalSessions", totalSessions);
-        stats.put("activeUserCount", userCount);
-        stats.put("avgMessagesPerSession", totalSessions > 0 ? Math.round(100.0 * totalMessages / totalSessions) / 100.0 : 0);
+        Map<String, Object> result = new HashMap<>();
+        result.put("totalMessages", totalMessages);
+        result.put("totalUserMessages", totalUserMessages);
+        result.put("totalAiMessages", totalMessages - totalUserMessages);
+        result.put("totalSessions", totalSessions);
+        result.put("activeUserCount", stats.getOrDefault("active_user_count", 0));
+        result.put("avgMessagesPerSession", totalSessions > 0
+                ? Math.round(100.0 * totalMessages / totalSessions) / 100.0 : 0);
 
-        return Result.success(stats);
+        return Result.success(result);
     }
 
     private String truncate(String s, int len) {

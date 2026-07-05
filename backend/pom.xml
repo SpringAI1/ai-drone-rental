@@ -174,6 +174,18 @@
             <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
         </dependency>
 
+        <!-- Spring AI - Tika Document Reader (解析 PDF/Word/PPT/Excel 等) -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-tika-document-reader</artifactId>
+        </dependency>
+
+        <!-- BCrypt 密码哈希（替换 MD5） -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -192,8 +204,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
                 <configuration>
-                    <source>21</source>
-                    <target>21</target>
+                    <source>17</source>
+                    <target>17</target>
                     <encoding>UTF-8</encoding>
                     <annotationProcessorPaths>
                         <path>

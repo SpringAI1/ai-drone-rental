@@ -149,7 +149,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import GlassCard from '@/components/common/GlassCard.vue'
 import StatTile from '@/components/common/StatTile.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import request from '@/utils/request'
+import request from '@/api/request'
 
 const pageNum = ref(1)
 const pageSize = ref(10)

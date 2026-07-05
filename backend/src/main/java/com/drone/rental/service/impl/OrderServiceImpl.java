@@ -319,7 +319,11 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (order.getOrderStatus() != Constants.ORDER_STATUS_RENTING) {
             throw new BusinessException("订单状态不允许申请退租");
         }
-        // 这里可以发通知给管理员，目前先保留 hook
+        // 用户自助退租：标记为已归还 + 记录归还时间 + 归还库存
+        order.setOrderStatus(Constants.ORDER_STATUS_RETURNED);
+        order.setReturnTime(LocalDateTime.now());
+        this.updateById(order);
+        droneService.increaseStock(order.getDroneId(), 1, orderId);
     }
 
     @Override

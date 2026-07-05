@@ -65,6 +65,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/ai/v3/status",
                         "/ai/v3/rag/search",
                         "/ai/v3/tools",
+                        // 知识库公共接口（未登录也可浏览公共文档 + 检索）
+                        "/ai/v3/knowledge/public",
+                        "/ai/v3/knowledge/search",
+                        "/ai/v3/knowledge/stats",
                         // MCP Server (Model Context Protocol) 端点
                         // 让 Claude Desktop / Cursor 等外部 MCP 客户端可匿名访问
                         "/mcp/**",

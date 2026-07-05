@@ -18,22 +18,69 @@ import com.drone.rental.security.UserContext;
 import com.drone.rental.service.UserService;
 import com.drone.rental.vo.LoginVO;
 import com.drone.rental.vo.UserVO;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 /**
  * 用户服务实现类
  */
+@Slf4j
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     @Autowired
     private JwtUtil jwtUtil;
 
+    /** BCrypt 密码编码器 - 替换不安全的 MD5 */
+    private static final BCryptPasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
+
+    /** 密码最小长度 */
+    private static final int MIN_PASSWORD_LENGTH = 6;
+
+    /**
+     * 验证密码是否匹配，兼容旧 MD5 格式。
+     * 返回 true 表示匹配，调用方可通过 needsMigration() 判断是否需要升级哈希。
+     */
+    private boolean passwordMatches(String rawPassword, String storedPassword) {
+        if (storedPassword == null) return false;
+        // BCrypt 哈希以 $2a$、$2b$、$2y$ 开头
+        if (storedPassword.startsWith("$2")) {
+            return PASSWORD_ENCODER.matches(rawPassword, storedPassword);
+        }
+        // 兼容旧 MD5 哈希（32 位 hex）
+        return DigestUtil.md5Hex(rawPassword).equals(storedPassword);
+    }
+
+    /** 判断存储的密码是否为旧 MD5 格式，需要迁移 */
+    private boolean needsMigration(String storedPassword) {
+        return storedPassword != null && !storedPassword.startsWith("$2");
+    }
+
+    /** 密码复杂度校验 */
+    private void validatePasswordStrength(String password) {
+        if (password == null || password.length() < MIN_PASSWORD_LENGTH) {
+            throw new BusinessException("密码长度不能少于" + MIN_PASSWORD_LENGTH + "位");
+        }
+        // 必须包含字母和数字
+        boolean hasLetter = false, hasDigit = false;
+        for (char c : password.toCharArray()) {
+            if (Character.isLetter(c)) hasLetter = true;
+            if (Character.isDigit(c)) hasDigit = true;
+        }
+        if (!hasLetter || !hasDigit) {
+            throw new BusinessException("密码必须包含字母和数字");
+        }
+    }
+
     @Override
     public void register(RegisterDTO dto) {
+        // 密码复杂度校验
+        validatePasswordStrength(dto.getPassword());
+
         User existUser = this.getOne(new LambdaQueryWrapper<User>()
                 .eq(User::getUsername, dto.getUsername()));
         if (existUser != null) {
@@ -42,7 +89,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         User user = new User();
         user.setUsername(dto.getUsername());
-        user.setPassword(DigestUtil.md5Hex(dto.getPassword()));
+        user.setPassword(PASSWORD_ENCODER.encode(dto.getPassword()));
         user.setNickname(StringUtils.hasText(dto.getNickname()) ? dto.getNickname() : dto.getUsername());
         user.setPhone(dto.getPhone());
         user.setEmail(dto.getEmail());
@@ -61,9 +108,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ResultCode.USER_PASSWORD_ERROR);
         }
 
-        String encryptedPassword = DigestUtil.md5Hex(dto.getPassword());
-        if (!encryptedPassword.equals(user.getPassword())) {
+        if (!passwordMatches(dto.getPassword(), user.getPassword())) {
             throw new BusinessException(ResultCode.USER_PASSWORD_ERROR);
+        }
+
+        // 旧 MD5 密码自动迁移到 BCrypt
+        if (needsMigration(user.getPassword())) {
+            user.setPassword(PASSWORD_ENCODER.encode(dto.getPassword()));
+            this.updateById(user);
+            log.info("用户 {} 密码已从 MD5 迁移至 BCrypt", user.getId());
         }
 
         if (user.getStatus() == Constants.USER_STATUS_DISABLED) {
@@ -94,9 +147,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ResultCode.USER_PASSWORD_ERROR);
         }
 
-        String encryptedPassword = DigestUtil.md5Hex(dto.getPassword());
-        if (!encryptedPassword.equals(user.getPassword())) {
+        if (!passwordMatches(dto.getPassword(), user.getPassword())) {
             throw new BusinessException(ResultCode.USER_PASSWORD_ERROR);
+        }
+
+        // 旧 MD5 密码自动迁移到 BCrypt
+        if (needsMigration(user.getPassword())) {
+            user.setPassword(PASSWORD_ENCODER.encode(dto.getPassword()));
+            this.updateById(user);
+            log.info("管理员 {} 密码已从 MD5 迁移至 BCrypt", user.getId());
         }
 
         if (user.getRole() != Constants.ROLE_ADMIN) {
@@ -171,12 +230,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ResultCode.USER_NOT_EXIST);
         }
 
-        String encryptedOldPassword = DigestUtil.md5Hex(oldPassword);
-        if (!encryptedOldPassword.equals(user.getPassword())) {
+        if (!passwordMatches(oldPassword, user.getPassword())) {
             throw new BusinessException("原密码错误");
         }
 
-        user.setPassword(DigestUtil.md5Hex(newPassword));
+        // 新密码复杂度校验
+        validatePasswordStrength(newPassword);
+
+        user.setPassword(PASSWORD_ENCODER.encode(newPassword));
         this.updateById(user);
     }
 
@@ -238,7 +299,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (user == null) {
             throw new BusinessException(ResultCode.USER_NOT_EXIST);
         }
-        user.setPassword(DigestUtil.md5Hex("123456"));
+        user.setPassword(PASSWORD_ENCODER.encode("123456"));
         this.updateById(user);
     }
 
