@@ -86,9 +86,13 @@ public class UserController {
     @Operation(summary = "用户充值")
     @PostMapping("/recharge")
     public Result<Void> recharge(@RequestBody java.util.Map<String, Object> params) {
-        java.math.BigDecimal amount = new java.math.BigDecimal(
-            String.valueOf(params.getOrDefault("amount", 0))
-        );
+        Object raw = params != null ? params.get("amount") : null;
+        java.math.BigDecimal amount;
+        try {
+            amount = new java.math.BigDecimal(String.valueOf(raw != null ? raw : 0));
+        } catch (NumberFormatException e) {
+            return Result.error("充值金额格式不正确");
+        }
         userService.recharge(amount);
         return Result.success();
     }

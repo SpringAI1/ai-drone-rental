@@ -144,12 +144,12 @@ const popularDrones = ref([])
 const recentOrders = ref([])
 
 const getOrderStatusText = (status) => {
-  const map = { 0: '待支付', 1: '待发货', 2: '待收货', 3: '租赁中', 4: '待归还', 5: '已完成', 6: '已取消' }
+  const map = { 0: '待支付', 1: '待发货', 2: '待收货', 3: '租赁中', 4: '已归还', 5: '已取消', 6: '已退款' }
   return map[status] || '未知'
 }
 
 const getOrderStatusType = (status) => {
-  const map = { 0: 'warning', 1: 'info', 2: 'info', 3: 'primary', 4: 'warning', 5: 'success', 6: 'default' }
+  const map = { 0: 'warning', 1: 'info', 2: 'info', 3: 'primary', 4: 'success', 5: 'default', 6: 'default' }
   return map[status] || 'default'
 }
 

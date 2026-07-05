@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.drone.rental.common.Result;
 import com.drone.rental.entity.Comment;
 import com.drone.rental.entity.Drone;
+import com.drone.rental.security.UserContext;
 import com.drone.rental.service.CommentService;
 import com.drone.rental.service.DroneService;
 import com.drone.rental.vo.CommentVO;
@@ -72,11 +73,15 @@ public class DroneController {
         return Result.success(page);
     }
 
-    @Operation(summary = "更新无人机图片")
+    @Operation(summary = "更新无人机图片（仅管理员）")
     @PutMapping("/{id}/image")
     public Result<Void> updateDroneImage(
             @PathVariable Long id,
             @RequestParam String image) {
+        // 权限校验：仅管理员可修改设备图片
+        if (!UserContext.isAdmin()) {
+            return Result.error("无权限操作");
+        }
         droneService.updateDroneImage(id, image);
         return Result.success();
     }

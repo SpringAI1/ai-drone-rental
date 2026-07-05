@@ -172,7 +172,19 @@ public class AdminDashboardController {
         List<String> dates = new ArrayList<>();
         List<Long> values = new ArrayList<>();
 
-        int days = 7;
+        int days;
+        switch (period) {
+            case "year":
+                days = 365;
+                break;
+            case "month":
+                days = 30;
+                break;
+            case "week":
+            default:
+                days = 7;
+                break;
+        }
         LocalDate today = LocalDate.now();
 
         for (int i = days - 1; i >= 0; i--) {

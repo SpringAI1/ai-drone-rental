@@ -77,6 +77,7 @@ public class AiConfigServiceImpl extends ServiceImpl<AiConfigMapper, AiConfig> i
     }
 
     @Override
+    @CacheEvict(value = "aiStatus", allEntries = true)
     public void setAiStatus(boolean enabled) {
         AiConfig config = getByKey(AI_STATUS_KEY);
         if (config == null) {

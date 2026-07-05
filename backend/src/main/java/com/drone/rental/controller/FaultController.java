@@ -10,6 +10,7 @@ import com.drone.rental.service.DroneService;
 import com.drone.rental.service.FaultReportService;
 import com.drone.rental.service.MaintenanceTicketService;
 import com.drone.rental.service.NotificationService;
+import com.drone.rental.service.OrderService;
 import com.drone.rental.vo.FaultReportVO;
 import com.drone.rental.websocket.OrderNotificationHandler;
 
@@ -45,6 +46,9 @@ public class FaultController {
 
     @Autowired
     private OrderNotificationHandler notificationHandler;
+
+    @Autowired
+    private OrderService orderService;
 
     @Operation(summary = "上报故障")
     @PostMapping("/report")
@@ -91,6 +95,8 @@ public class FaultController {
     @Operation(summary = "根据订单ID获取故障报修列表")
     @GetMapping("/order/{orderId}")
     public Result<List<FaultReportVO>> getFaultReportsByOrderId(@PathVariable Long orderId) {
+        // 权限校验：orderService.getOrderDetail 内部会校验订单归属（非管理员+非本人→FORBIDDEN）
+        orderService.getOrderDetail(orderId);
         List<FaultReportVO> list = faultReportService.getFaultReportsByOrderId(orderId);
         return Result.success(list);
     }

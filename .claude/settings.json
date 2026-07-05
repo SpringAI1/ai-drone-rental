@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node /Users/chenxi/Desktop/AI-Rental/frontend-uniapp/node_modules/vue-demi/scripts/postinstall.js)",
+      "Bash(node /Users/chenxi/Desktop/AI-Rental/frontend-uniapp/node_modules/vue-demi/scripts/switch-cli.js)",
+      "Bash(node -e \"console.log\\(require\\('/Users/chenxi/Desktop/AI-Rental/frontend-uniapp/node_modules/vue/package.json'\\).version\\)\")",
+      "Bash(node -e \"const v = require\\('vue'\\); console.log\\('hasInjectionContext' in v ? 'EXISTS' : 'MISSING'\\)\")",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(curl -s -I -X OPTIONS -H \"Origin: http://localhost:3000\" -H \"Access-Control-Request-Method: POST\" http://localhost:8080/api/auth/login)",
+      "Bash(sqlite3 /Users/chenxi/Desktop/AI-Rental/backend/drone_rental.db \"DELETE FROM user WHERE username IN \\('testuser99','e2etest'\\); SELECT changes\\(\\);\")",
+      "Bash(git -C /Users/chenxi/Desktop/AI-Rental status --short)",
+      "Bash(git -C /Users/chenxi/Desktop/AI-Rental rm --cached backend/drone_rental.db)",
+      "Bash(npm run *)",
+      "Bash(mvn clean *)",
+      "Bash(git -C /Users/chenxi/Desktop/AI-Rental remote -v)",
+      "Bash(git -C /Users/chenxi/Desktop/AI-Rental add -A)",
+      "Bash(git -C /Users/chenxi/Desktop/AI-Rental reset HEAD .claude/settings.json)",
+      "Bash(git -C /Users/chenxi/Desktop/AI-Rental reset HEAD backend/drone_rental.db)",
+      "Bash(git -C /Users/chenxi/Desktop/AI-Rental commit -m 'feat: 安全加固 + 知识库 + 全栈联调测试通过 *)",
+      "Bash(git -C /Users/chenxi/Desktop/AI-Rental push origin main)",
+      "Bash(npx vue-tsc *)",
+      "Bash(mkdir -p /Users/chenxi/Desktop/AI-Rental/frontend-uniapp/.vscode)",
+      "Bash(git -C /Users/chenxi/Desktop/AI-Rental add -f frontend-uniapp/.vscode/settings.json)",
+      "Bash(git -C /Users/chenxi/Desktop/AI-Rental commit -m 'fix: UniApp IDE 类型声明修复 + BOSS简历文案 *)"
+    ],
+    "additionalDirectories": [
+      "/Users/chenxi/Desktop/AI-Rental/frontend-uniapp"
+    ]
+  }
+}

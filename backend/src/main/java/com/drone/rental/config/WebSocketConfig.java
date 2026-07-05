@@ -2,6 +2,7 @@ package com.drone.rental.config;
 
 import com.drone.rental.security.JwtUtil;
 import com.drone.rental.websocket.OrderNotificationHandler;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
@@ -31,6 +32,9 @@ public class WebSocketConfig implements WebSocketConfigurer {
     private final OrderNotificationHandler orderNotificationHandler;
     private final JwtUtil jwtUtil;
 
+    @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:8080}")
+    private String allowedOrigins;
+
     public WebSocketConfig(OrderNotificationHandler orderNotificationHandler, JwtUtil jwtUtil) {
         this.orderNotificationHandler = orderNotificationHandler;
         this.jwtUtil = jwtUtil;
@@ -39,7 +43,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(orderNotificationHandler, "/ws/orders")
-                .setAllowedOrigins("*")
+                .setAllowedOrigins(allowedOrigins.split(","))
                 .addInterceptors(new TokenHandshakeInterceptor());
     }
 

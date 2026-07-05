@@ -28,8 +28,25 @@ public class AirspaceRecordServiceImpl extends ServiceImpl<AirspaceRecordMapper,
         implements AirspaceRecordService {
 
     @Override
-    public void submitAirspaceRecord(AirspaceRecordDTO dto) {
+    public AirspaceRecord submitAirspaceRecord(AirspaceRecordDTO dto) {
         Long userId = UserContext.getCurrentUserId();
+
+        // 基础校验
+        if (dto.getRegionName() == null || dto.getRegionName().trim().isEmpty()) {
+            throw new BusinessException("飞行区域名称不能为空");
+        }
+        if (dto.getMaxAltitude() == null || dto.getMaxAltitude() <= 0) {
+            throw new BusinessException("请输入有效的最大飞行高度");
+        }
+        if (dto.getPlannedStartTime() == null) {
+            throw new BusinessException("请输入有效的开始时间");
+        }
+        if (dto.getPlannedEndTime() == null) {
+            throw new BusinessException("请输入有效的结束时间");
+        }
+        if (dto.getPlannedEndTime().isBefore(dto.getPlannedStartTime())) {
+            throw new BusinessException("结束时间不能早于开始时间");
+        }
 
         AirspaceRecord record = new AirspaceRecord();
         BeanUtils.copyProperties(dto, record);
@@ -37,6 +54,7 @@ public class AirspaceRecordServiceImpl extends ServiceImpl<AirspaceRecordMapper,
         record.setAuditStatus(Constants.AUDIT_STATUS_PENDING);
 
         this.save(record);
+        return record;
     }
 
     @Override

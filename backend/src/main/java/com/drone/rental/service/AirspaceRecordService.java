@@ -16,7 +16,7 @@ public interface AirspaceRecordService extends IService<AirspaceRecord> {
     /**
      * 提交空域备案
      */
-    void submitAirspaceRecord(AirspaceRecordDTO dto);
+    AirspaceRecord submitAirspaceRecord(AirspaceRecordDTO dto);
 
     /**
      * 获取当前用户的空域备案列表

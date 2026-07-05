@@ -1,6 +1,5 @@
 package com.drone.rental.controller;
 
-import com.drone.rental.common.Constants;
 import com.drone.rental.common.Result;
 import com.drone.rental.dto.AirspaceRecordDTO;
 import com.drone.rental.entity.AirspaceRecord;
@@ -12,8 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -87,71 +84,40 @@ public class AirspaceController {
     @Operation(summary = "提交空域备案（兼容多种时间格式）")
     @PostMapping("/submit")
     public Result<Void> submitAirspaceRecord(@RequestBody Map<String, Object> request) {
-        String regionName = (String) request.get("regionName");
-        if (!StringUtils.hasText(regionName)) {
-            return Result.error("飞行区域名称不能为空");
-        }
-
-        String regionAddress = (String) request.get("regionAddress");
-        BigDecimal longitude = parseBigDecimal(request.get("longitude"), null);
-        BigDecimal latitude = parseBigDecimal(request.get("latitude"), null);
-        Integer radius = parseInt(request.get("radius"), 500);
-        Integer maxAltitude = parseInt(request.get("maxAltitude"), null);
-        LocalDateTime plannedStartTime = parseDateTime(request.get("plannedStartTime"));
-        LocalDateTime plannedEndTime = parseDateTime(request.get("plannedEndTime"));
-        String purpose = (String) request.get("purpose");
-
-        if (maxAltitude == null || maxAltitude <= 0) {
-            return Result.error("请输入有效的最大飞行高度");
-        }
-        if (plannedStartTime == null) {
-            return Result.error("请输入有效的开始时间，格式：2025-01-01 10:00");
-        }
-        if (plannedEndTime == null) {
-            return Result.error("请输入有效的结束时间，格式：2025-01-01 18:00");
-        }
-        if (plannedEndTime.isBefore(plannedStartTime)) {
-            return Result.error("结束时间不能早于开始时间");
-        }
+        // 构建 DTO 并委托给 Service 层（不再绕过 Service 直接操作 entity）
+        AirspaceRecordDTO dto = new AirspaceRecordDTO();
+        dto.setRegionName((String) request.get("regionName"));
+        dto.setRegionAddress((String) request.get("regionAddress"));
+        dto.setLongitude(parseBigDecimal(request.get("longitude"), null));
+        dto.setLatitude(parseBigDecimal(request.get("latitude"), null));
+        dto.setRadius(parseInt(request.get("radius"), 500));
+        dto.setMaxAltitude(parseInt(request.get("maxAltitude"), null));
+        dto.setPlannedStartTime(parseDateTime(request.get("plannedStartTime")));
+        dto.setPlannedEndTime(parseDateTime(request.get("plannedEndTime")));
+        dto.setPurpose((String) request.get("purpose"));
 
         Long userId = UserContext.getCurrentUserId();
-        AirspaceRecord record = new AirspaceRecord();
-        record.setUserId(userId);
-        record.setRegionName(regionName);
-        record.setRegionAddress(regionAddress);
-        record.setLongitude(longitude);
-        record.setLatitude(latitude);
-        record.setRadius(radius);
-        record.setMaxAltitude(maxAltitude);
-        record.setPlannedStartTime(plannedStartTime);
-        record.setPlannedEndTime(plannedEndTime);
-        record.setPurpose(purpose);
-        record.setAuditStatus(Constants.AUDIT_STATUS_PENDING);
+        AirspaceRecord record = airspaceRecordService.submitAirspaceRecord(dto);
 
+        // 通知管理员（Controller 层负责 HTTP/通知层面的横切关注点）
         try {
-            airspaceRecordService.save(record);
+            String content = "区域：" + record.getRegionName()
+                    + "，目的：" + (record.getPurpose() != null && record.getPurpose().length() > 20
+                        ? record.getPurpose().substring(0, 20) + "..." : record.getPurpose());
+            notificationService.sendNotification(-1L, 4, "空域备案待审核", content, record.getId());
 
-            // 广播新的空域备案通知给管理员
-            try {
-                String content = "区域：" + regionName + "，目的：" + (purpose != null && purpose.length() > 20 ? purpose.substring(0, 20) + "..." : purpose);
-                notificationService.sendNotification(-1L, 4, "空域备案待审核", content, record.getId());
-
-                Map<String, Object> airspaceInfo = new HashMap<>();
-                airspaceInfo.put("id", record.getId());
-                airspaceInfo.put("userId", userId);
-                airspaceInfo.put("regionName", regionName);
-                airspaceInfo.put("content", content);
-                airspaceInfo.put("title", "新的空域备案申请");
-                notificationHandler.notifyNewAirspace(airspaceInfo);
-            } catch (Exception e) {
-                // 通知失败不影响主流程
-            }
-
-            return Result.success();
+            Map<String, Object> airspaceInfo = new HashMap<>();
+            airspaceInfo.put("id", record.getId());
+            airspaceInfo.put("userId", userId);
+            airspaceInfo.put("regionName", record.getRegionName());
+            airspaceInfo.put("content", content);
+            airspaceInfo.put("title", "新的空域备案申请");
+            notificationHandler.notifyNewAirspace(airspaceInfo);
         } catch (Exception e) {
-            log.error("空域备案保存失败", e);
-            return Result.error("备案信息保存失败：" + e.getMessage());
+            log.warn("空域备案通知发送失败（不影响主流程）: {}", e.getMessage());
         }
+
+        return Result.success();
     }
 
     @Operation(summary = "获取当前用户的空域备案列表")

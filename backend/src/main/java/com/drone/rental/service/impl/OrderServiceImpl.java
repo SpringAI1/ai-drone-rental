@@ -223,12 +223,13 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         if (!canCancel) {
             throw new BusinessException(ResultCode.ORDER_CANNOT_CANCEL);
         }
-        // 已支付/已发货的订单取消时退还余额
+        // 已支付/已发货的订单取消时退还余额 + 更新支付记录
         if (Objects.equals(status, Constants.ORDER_STATUS_PAID)
                 || Objects.equals(status, Constants.ORDER_STATUS_SHIPPED)) {
             if (order.getTotalAmount() != null && order.getTotalAmount().compareTo(BigDecimal.ZERO) > 0) {
                 userService.increaseBalance(order.getUserId(), order.getTotalAmount());
             }
+            paymentService.refundPayment(orderId, reason != null ? reason : "取消订单自动退款");
         }
         order.setOrderStatus(Constants.ORDER_STATUS_CANCELLED);
         order.setCancelReason(reason);
@@ -268,6 +269,10 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         order.setCancelReason(reason);
         order.setCancelTime(LocalDateTime.now());
         this.updateById(order);
+        // 退还余额给用户
+        if (order.getTotalAmount() != null && order.getTotalAmount().compareTo(BigDecimal.ZERO) > 0) {
+            userService.increaseBalance(order.getUserId(), order.getTotalAmount());
+        }
         paymentService.refundPayment(orderId, reason);
         droneService.increaseStock(order.getDroneId(), 1, orderId);
     }
@@ -369,6 +374,9 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
                 if (currentStatus != Constants.ORDER_STATUS_PAID) {
                     throw new BusinessException("只有已支付的订单可以更新为已退款");
                 }
+                if (order.getTotalAmount() != null && order.getTotalAmount().compareTo(BigDecimal.ZERO) > 0) {
+                    userService.increaseBalance(order.getUserId(), order.getTotalAmount());
+                }
                 paymentService.refundPayment(orderId, "管理员手动退款");
                 droneService.increaseStock(order.getDroneId(), 1, orderId);
                 break;
@@ -415,6 +423,10 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         order.setCancelReason(reason);
         order.setCancelTime(LocalDateTime.now());
         this.updateById(order);
+        // 退还余额给用户
+        if (order.getTotalAmount() != null && order.getTotalAmount().compareTo(BigDecimal.ZERO) > 0) {
+            userService.increaseBalance(order.getUserId(), order.getTotalAmount());
+        }
         paymentService.refundPayment(orderId, reason);
         droneService.increaseStock(order.getDroneId(), 1, orderId);
     }

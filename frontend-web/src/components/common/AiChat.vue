@@ -1,6 +1,5 @@
 <template>
   <div
-    v-if="authStore.isLoggedIn"
     class="chat-float"
     :class="{
       'chat-float--expanded': isExpanded,
@@ -75,7 +74,7 @@
             </div>
             <h3>AI咨询顾问</h3>
             <p>我可以帮你推荐无人机、解答租赁问题、说明订单流程等</p>
-            <div v-if="!authStore.isLogin" class="chat-messages__welcome-login">
+            <div v-if="!authStore.isLoggedIn" class="chat-messages__welcome-login">
               <el-button type="primary" size="small" @click="handleGoLogin">
                 登录查看更多服务
               </el-button>
@@ -129,7 +128,7 @@
         <div class="chat-input">
           <el-input
             v-model="inputMessage"
-            :placeholder="authStore.isLogin ? '输入你的问题，例如：我该选哪种机型做航拍？' : '输入你的问题，登录后可查看个人订单等服务'"
+            :placeholder="authStore.isLoggedIn ? '输入你的问题，例如：我该选哪种机型做航拍？' : '输入你的问题，登录后可查看个人订单等服务'"
             :disabled="isLoading"
             @keyup.enter="sendMessage"
             class="chat-input__field"
@@ -153,8 +152,8 @@
             <el-icon><Delete /></el-icon>
             清空会话
           </el-button>
-          <span v-if="authStore.isLogin && conversationId" class="chat-footer__tips">当前会话ID: {{ conversationId.substring(0, 8) }}...</span>
-          <span v-if="!authStore.isLogin" class="chat-footer__tips">未登录状态，部分功能受限</span>
+          <span v-if="authStore.isLoggedIn && conversationId" class="chat-footer__tips">当前会话ID: {{ conversationId.substring(0, 8) }}...</span>
+          <span v-if="!authStore.isLoggedIn" class="chat-footer__tips">未登录状态，部分功能受限</span>
         </div>
       </div>
     </Transition>
@@ -359,7 +358,7 @@ const sendMessage = async () => {
     return
   }
 
-  if (!authStore.isLogin && (text.includes('订单') || text.includes('我的') || text.includes('个人') || text.includes('租赁记录') || text.includes('支付'))) {
+  if (!authStore.isLoggedIn && (text.includes('订单') || text.includes('我的') || text.includes('个人') || text.includes('租赁记录') || text.includes('支付'))) {
     ElMessage.warning('请先登录查看个人订单等服务')
     router.push('/login')
     return

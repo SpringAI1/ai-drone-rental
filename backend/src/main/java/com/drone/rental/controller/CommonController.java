@@ -50,11 +50,18 @@ public class CommonController {
         }
     }
 
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
     @Operation(summary = "上传文件（仅支持图片）")
     @PostMapping("/upload")
     public Result<String> uploadFile(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
             return Result.error("请选择要上传的文件");
+        }
+
+        // 文件大小限制
+        if (file.getSize() > MAX_FILE_SIZE) {
+            return Result.error("文件大小不能超过 10MB");
         }
 
         String originalFilename = file.getOriginalFilename();
