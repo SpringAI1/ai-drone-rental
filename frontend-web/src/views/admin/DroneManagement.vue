@@ -389,6 +389,7 @@ const handleEdit = (row) => {
     flightTime: row.flightTime != null ? Number(row.flightTime) : 0,
     maxSpeed: row.maxSpeed != null ? Number(row.maxSpeed) : 0,
     maxPayload: row.maxPayload != null ? Number(row.maxPayload) : 0,
+    deposit: row.deposit != null ? Number(row.deposit) : 0,
     description: row.description || '',
     image: row.image || ''
   })
@@ -445,6 +446,7 @@ const handleSave = async () => {
         flightTime: Number(form.flightTime) || 0,
         maxSpeed: Number(form.maxSpeed) || 0,
         maxPayload: Number(form.maxPayload) || 0,
+        deposit: Number(form.deposit) || 0,
         status: form.status != null ? Number(form.status) : 1,
         onShelf: form.onShelf != null ? Number(form.onShelf) : 1
       }

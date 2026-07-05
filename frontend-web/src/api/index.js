@@ -8,6 +8,7 @@ export * as commentApi from './comment'
 export * as adminApi from './admin'
 export * as aiApi from './ai'
 export * as airspaceApi from './airspace'
+export * as knowledgeApi from './knowledge'
 export * as publicApi from './public'
 export * as notificationApi from './notification'
 

@@ -113,6 +113,7 @@ const fetchNotifications = async () => {
     total.value = res.data?.total || 0
   } catch (error) {
     console.error('获取通知失败:', error)
+    ElMessage.error('获取通知失败，请稍后重试')
   } finally {
     loading.value = false
   }

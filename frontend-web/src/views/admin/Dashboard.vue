@@ -90,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, markRaw } from 'vue'
+import { ref, onMounted, onUnmounted, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import {
@@ -363,9 +363,15 @@ onMounted(() => {
   fetchRecentOrders()
 
   // 监听窗口大小变化
-  window.addEventListener('resize', () => {
+  const onResize = () => {
     revenueChart?.resize()
     orderChart?.resize()
+  }
+  window.addEventListener('resize', onResize)
+
+  // 组件卸载时清理事件监听器
+  onUnmounted(() => {
+    window.removeEventListener('resize', onResize)
   })
 })
 </script>
