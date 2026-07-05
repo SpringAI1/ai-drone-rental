@@ -278,7 +278,7 @@ public class MaintenanceTicketServiceImpl extends ServiceImpl<MaintenanceTicketM
         if (drone != null && drone.getStock() != null && drone.getStock() > 0) {
             droneService.updateStatus(ticket.getDroneId(), Constants.DRONE_STATUS_AVAILABLE);
         } else {
-            log.warn("维修完成但无人机 {} 库存为0，设为缺货状态", ticket.getDroneId());
+            log.warn("维修完成但无人机库存为0，设为缺货状态 droneId=" + ticket.getDroneId());
             droneService.updateStatus(ticket.getDroneId(), Constants.DRONE_STATUS_OUT_OF_STOCK);
         }
     }

@@ -176,7 +176,6 @@ public class DroneServiceImpl extends ServiceImpl<DroneMapper, Drone> implements
         if (dto.getDescription() != null) drone.setDescription(dto.getDescription());
         if (dto.getImage() != null) drone.setImage(dto.getImage());
         if (dto.getPricePerDay() != null) drone.setPricePerDay(dto.getPricePerDay());
-        if (dto.getDeposit() != null) drone.setDeposit(dto.getDeposit());
         if (dto.getStock() != null) drone.setStock(dto.getStock());
         if (dto.getFlightTime() != null) drone.setFlightTime(dto.getFlightTime());
         if (dto.getMaxSpeed() != null) drone.setMaxSpeed(dto.getMaxSpeed());
