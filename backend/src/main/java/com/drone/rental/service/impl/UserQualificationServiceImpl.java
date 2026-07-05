@@ -45,8 +45,7 @@ public class UserQualificationServiceImpl extends ServiceImpl<UserQualificationM
         // 检查是否已有资质记录
         UserQualification existing = this.getOne(new LambdaQueryWrapper<UserQualification>()
                 .eq(UserQualification::getUserId, userId)
-                .orderByDesc(UserQualification::getCreatedTime)
-                .last("LIMIT 1"));
+                .orderByDesc(UserQualification::getCreatedTime));
 
         // 如果有待审核的资质，不允许重复提交
         if (existing != null && existing.getAuditStatus() == Constants.AUDIT_STATUS_PENDING) {
@@ -70,8 +69,7 @@ public class UserQualificationServiceImpl extends ServiceImpl<UserQualificationM
         Long userId = UserContext.getCurrentUserId();
         return this.getOne(new LambdaQueryWrapper<UserQualification>()
                 .eq(UserQualification::getUserId, userId)
-                .orderByDesc(UserQualification::getCreatedTime)
-                .last("LIMIT 1"));
+                .orderByDesc(UserQualification::getCreatedTime));
     }
 
     @Override
@@ -140,8 +138,7 @@ public class UserQualificationServiceImpl extends ServiceImpl<UserQualificationM
         UserQualification qualification = this.getOne(new LambdaQueryWrapper<UserQualification>()
                 .eq(UserQualification::getUserId, userId)
                 .eq(UserQualification::getAuditStatus, Constants.AUDIT_STATUS_APPROVED)
-                .orderByDesc(UserQualification::getCreatedTime)
-                .last("LIMIT 1"));
+                .orderByDesc(UserQualification::getCreatedTime));
 
         if (qualification == null) {
             throw new BusinessException(ResultCode.QUALIFICATION_NOT_APPROVED);

@@ -209,8 +209,7 @@ public class MaintenanceTicketServiceImpl extends ServiceImpl<MaintenanceTicketM
     @Override
     public MaintenanceTicket getByFaultReportId(Long faultReportId) {
         return this.getOne(new LambdaQueryWrapper<MaintenanceTicket>()
-                .eq(MaintenanceTicket::getFaultReportId, faultReportId)
-                .last("LIMIT 1"));
+                .eq(MaintenanceTicket::getFaultReportId, faultReportId));
     }
 
     @Override
@@ -274,8 +273,14 @@ public class MaintenanceTicketServiceImpl extends ServiceImpl<MaintenanceTicketM
 
         this.updateById(ticket);
 
-        // 将无人机状态恢复为在售
-        droneService.updateStatus(ticket.getDroneId(), Constants.DRONE_STATUS_AVAILABLE);
+        // 恢复无人机状态前检查库存：库存为0时设为缺货而非可用
+        Drone drone = droneService.getById(ticket.getDroneId());
+        if (drone != null && drone.getStock() != null && drone.getStock() > 0) {
+            droneService.updateStatus(ticket.getDroneId(), Constants.DRONE_STATUS_AVAILABLE);
+        } else {
+            log.warn("维修完成但无人机 {} 库存为0，设为缺货状态", ticket.getDroneId());
+            droneService.updateStatus(ticket.getDroneId(), Constants.DRONE_STATUS_OUT_OF_STOCK);
+        }
     }
 
     /**

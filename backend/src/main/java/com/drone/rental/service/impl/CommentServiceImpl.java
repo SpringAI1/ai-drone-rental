@@ -153,6 +153,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
 
+        // 级联删除子评论
+        this.remove(new LambdaQueryWrapper<Comment>().eq(Comment::getParentId, id));
         this.removeById(id);
     }
 

@@ -139,7 +139,11 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         }
         wrapper.orderByDesc(RentalOrder::getCreatedTime);
         IPage<RentalOrder> orderPage = this.page(page, wrapper);
-        return orderPage.convert(orderConverter::convertToVO);
+        // 批量加载关联数据，避免 N+1
+        List<OrderVO> voList = orderConverter.convertBatch(orderPage.getRecords());
+        IPage<OrderVO> voPage = new Page<>(pageNum, pageSize, orderPage.getTotal());
+        voPage.setRecords(voList);
+        return voPage;
     }
 
     @Override
@@ -171,7 +175,10 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
         wrapper.orderByDesc(RentalOrder::getCreatedTime);
 
         IPage<RentalOrder> orderPage = this.page(page, wrapper);
-        return orderPage.convert(orderConverter::convertToVO);
+        List<OrderVO> voList = orderConverter.convertBatch(orderPage.getRecords());
+        IPage<OrderVO> voPage = new Page<>(pageNum, pageSize, orderPage.getTotal());
+        voPage.setRecords(voList);
+        return voPage;
     }
 
     @Override

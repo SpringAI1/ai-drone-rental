@@ -70,8 +70,7 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentMapper, Payment> impl
     @Override
     public Payment getByOrderId(Long orderId) {
         return this.getOne(new LambdaQueryWrapper<Payment>()
-                .eq(Payment::getOrderId, orderId)
-                .last("LIMIT 1"));
+                .eq(Payment::getOrderId, orderId));
     }
 
     @Override

@@ -299,8 +299,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (user == null) {
             throw new BusinessException(ResultCode.USER_NOT_EXIST);
         }
-        user.setPassword(PASSWORD_ENCODER.encode("123456"));
+        // 生成随机密码（8位字母数字混合），强制用户登录后修改
+        String randomPassword = cn.hutool.core.util.RandomUtil.randomString(8);
+        user.setPassword(PASSWORD_ENCODER.encode(randomPassword));
         this.updateById(user);
+        log.info("管理员重置了用户 {} 的密码，新密码为随机生成", userId);
     }
 
     @Override

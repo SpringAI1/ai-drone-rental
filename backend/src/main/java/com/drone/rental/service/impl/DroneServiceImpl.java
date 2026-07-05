@@ -169,7 +169,21 @@ public class DroneServiceImpl extends ServiceImpl<DroneMapper, Drone> implements
         }
 
         Integer oldStock = drone.getStock();
-        BeanUtils.copyProperties(dto, drone);
+        // 只复制非 null 字段，避免 DTO 中的 null 值意外覆盖实体已有数据
+        if (dto.getBrand() != null) drone.setBrand(dto.getBrand());
+        if (dto.getModel() != null) drone.setModel(dto.getModel());
+        if (dto.getType() != null) drone.setType(dto.getType());
+        if (dto.getDescription() != null) drone.setDescription(dto.getDescription());
+        if (dto.getImage() != null) drone.setImage(dto.getImage());
+        if (dto.getPricePerDay() != null) drone.setPricePerDay(dto.getPricePerDay());
+        if (dto.getDeposit() != null) drone.setDeposit(dto.getDeposit());
+        if (dto.getStock() != null) drone.setStock(dto.getStock());
+        if (dto.getFlightTime() != null) drone.setFlightTime(dto.getFlightTime());
+        if (dto.getMaxSpeed() != null) drone.setMaxSpeed(dto.getMaxSpeed());
+        if (dto.getMaxRange() != null) drone.setMaxRange(dto.getMaxRange());
+        if (dto.getMaxPayload() != null) drone.setMaxPayload(dto.getMaxPayload());
+        if (dto.getStatus() != null) drone.setStatus(dto.getStatus());
+        if (dto.getOnShelf() != null) drone.setOnShelf(dto.getOnShelf());
         drone.setId(id);
         this.updateById(drone);
 
@@ -187,7 +201,9 @@ public class DroneServiceImpl extends ServiceImpl<DroneMapper, Drone> implements
         if (drone == null) {
             throw new BusinessException(ResultCode.DRONE_NOT_EXIST);
         }
-        this.removeById(id);
+        // 使用逻辑删除，而不是物理删除（与实体 @TableLogic 一致）
+        drone.setDeleted(1);
+        this.updateById(drone);
     }
 
     @Override
