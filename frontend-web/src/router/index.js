@@ -258,11 +258,6 @@ router.beforeEach((to, from, next) => {
     return next('/')
   }
 
-  // 管理员不能访问用户页面，自动跳转回管理后台
-  if (authStore.isAdmin && to.meta.requireAuth && !to.meta.requireAdmin) {
-    return next('/admin')
-  }
-
   next()
 })
 

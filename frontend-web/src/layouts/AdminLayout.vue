@@ -219,7 +219,16 @@ const connectOrderWebSocket = () => {
   try {
     const token = localStorage.getItem('token') || ''
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.hostname === 'localhost' ? 'localhost:8080' : window.location.host
+    // 从 VITE_API_BASE_URL 提取后端 host，部署到 Vercel 时指向 Tunnel
+    const apiBase = import.meta.env.VITE_API_BASE_URL || ''
+    let host
+    if (apiBase && apiBase.startsWith('http')) {
+      host = apiBase.replace(/^https?:\/\//, '').replace(/\/api$/, '')
+    } else if (window.location.hostname === 'localhost') {
+      host = 'localhost:8080'
+    } else {
+      host = window.location.host
+    }
     const wsUrl = `${protocol}//${host}/api/ws/orders?token=${encodeURIComponent(token)}`
     orderWs = new WebSocket(wsUrl)
 
