@@ -256,6 +256,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (status != null) {
             wrapper.eq(User::getStatus, status);
         }
+        // 用户管理列表不显示管理员账号
+        wrapper.ne(User::getRole, Constants.ROLE_ADMIN);
         wrapper.orderByDesc(User::getCreatedTime);
 
         IPage<User> userPage = this.page(page, wrapper);
