@@ -258,6 +258,11 @@ router.beforeEach((to, from, next) => {
     return next('/')
   }
 
+  // 管理员只能在管理端活动，访问用户端页面时静默跳转回管理后台
+  if (authStore.isAdmin && !to.path.startsWith('/admin')) {
+    return next('/admin')
+  }
+
   next()
 })
 
