@@ -49,6 +49,8 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Timer, Coin, Odometer } from '@element-plus/icons-vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
 const props = defineProps({
   drone: {
     type: Object,
@@ -68,7 +70,7 @@ const imageUrl = computed(() => {
   const url = props.drone.image
   if (!url) return defaultImage
   if (url.startsWith('http')) return url
-  return `/api${url}`
+  return `${API_BASE}${url}`
 })
 
 const statusText = computed(() => {

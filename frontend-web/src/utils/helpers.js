@@ -2,6 +2,8 @@
  * 共享工具函数 - 从多个组件中提取，避免重复定义
  */
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
 /** 订单状态 → 中文文本 */
 export function getOrderStatusText(status) {
   const map = { 0: '待支付', 1: '待发货', 2: '待收货', 3: '租赁中', 4: '已归还', 5: '已取消', 6: '已退款' }
@@ -25,11 +27,11 @@ export function getImageUrl(url) {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
   if (url.startsWith('/api/uploads/')) return url
-  if (url.startsWith('/uploads/')) return '/api' + url
-  return '/api' + (url.startsWith('/') ? '' : '/') + url
+  if (url.startsWith('/uploads/')) return API_BASE + url
+  return API_BASE + (url.startsWith('/') ? '' : '/') + url
 }
 
 /** 默认占位图 */
 export function getDefaultDroneImage() {
-  return '/api/uploads/drone_placeholder.png'
+  return API_BASE + '/uploads/drone_placeholder.png'
 }

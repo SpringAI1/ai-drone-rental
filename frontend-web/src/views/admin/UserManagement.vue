@@ -209,6 +209,8 @@ import GlassCard from '@/components/common/GlassCard.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { getUserList, getUserDetail, updateUserStatus, updateCreditStatus, resetUserPassword, getCreditRecords } from '@/api/admin'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
 const loading = ref(false)
 const userList = ref([])
 const total = ref(0)
@@ -272,7 +274,7 @@ const maskIdCard = (idCard) => {
 const getAvatarUrl = (avatar) => {
   if (!avatar) return ''
   if (avatar.startsWith('http')) return avatar
-  return `/api${avatar}`
+  return `${API_BASE}${avatar}`
 }
 
 const fetchUserList = async () => {

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "bash scripts/patch-vue-demi.sh && npm run build:h5",
+  "outputDirectory": "dist/build/h5",
+  "framework": "vite",
+  "installCommand": "npm install --legacy-peer-deps",
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

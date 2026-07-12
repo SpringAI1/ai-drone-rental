@@ -181,6 +181,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import AiChat from '@/components/common/AiChat.vue'
 import NotificationBell from '@/components/common/NotificationBell.vue'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
@@ -192,7 +194,7 @@ const avatarUrl = computed(() => {
   const avatar = authStore.user?.avatar
   if (!avatar) return ''
   if (avatar.startsWith('http')) return avatar
-  return `/api${avatar}`
+  return `${API_BASE}${avatar}`
 })
 
 const navItems = [

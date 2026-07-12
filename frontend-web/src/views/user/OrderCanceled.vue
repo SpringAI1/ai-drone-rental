@@ -82,6 +82,8 @@ import StatusTag from '@/components/common/StatusTag.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { getMyOrders } from '@/api/order'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
 const router = useRouter()
 const loading = ref(false)
 const orderList = ref([])
@@ -107,9 +109,9 @@ const getImageUrl = (url) => {
   if (!url) return ''
   if (url.startsWith('http')) return url
   if (url.startsWith('/api/uploads/')) return url
-  if (url.startsWith('/uploads/')) return `/api${url}`
-  if (!url.startsWith('/')) return `/api/uploads/${url}`
-  return `/api${url}`
+  if (url.startsWith('/uploads/')) return `${API_BASE}${url}`
+  if (!url.startsWith('/')) return `${API_BASE}/uploads/${url}`
+  return `${API_BASE}${url}`
 }
 
 const fetchOrders = async () => {

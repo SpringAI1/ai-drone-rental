@@ -164,6 +164,8 @@ import GlassCard from '@/components/common/GlassCard.vue'
 import { useAuthStore } from '@/stores/auth'
 import { getOrderDetail, payOrder } from '@/api/order'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -188,9 +190,9 @@ const getImageUrl = (url) => {
   if (!url) return ''
   if (url.startsWith('http')) return url
   if (url.startsWith('/api/uploads/')) return url
-  if (url.startsWith('/uploads/')) return `/api${url}`
-  if (!url.startsWith('/')) return `/api/uploads/${url}`
-  return `/api${url}`
+  if (url.startsWith('/uploads/')) return `${API_BASE}${url}`
+  if (!url.startsWith('/')) return `${API_BASE}/uploads/${url}`
+  return `${API_BASE}${url}`
 }
 
 const formatDate = (dateTime) => {

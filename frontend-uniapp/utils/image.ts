@@ -20,9 +20,9 @@ const LOCAL_DRONE_FILES = new Set([
 
 // API 基础地址（仅在 Web/H5 端访问后端时使用）
 // - 小程序端：不要用后端地址
-// - H5 端：默认走后端 8080
+// - H5 端：优先使用环境变量，默认走后端 8080
 // #ifdef H5
-const API_BASE_URL = 'http://localhost:8080'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace(/\/api$/, '') : 'http://localhost:8080'
 // #endif
 // #ifndef H5
 const API_BASE_URL = ''

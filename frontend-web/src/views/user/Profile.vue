@@ -437,6 +437,8 @@ import { updateUserInfo, updatePassword, submitQualification, uploadCertificate,
 import { upload } from '@/api/request'
 import { getMyComments, deleteMyComment } from '@/api/comment'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
 const router = useRouter()
 const authStore = useAuthStore()
 
@@ -454,7 +456,7 @@ const avatarUrl = computed(() => {
   const avatar = authStore.user?.avatar
   if (!avatar) return ''
   if (avatar.startsWith('http')) return avatar
-  return `/api${avatar}`
+  return `${API_BASE}${avatar}`
 })
 
 // 订单相关
@@ -661,9 +663,9 @@ const getImageUrl = (url) => {
   if (!url) return ''
   if (url.startsWith('http')) return url
   if (url.startsWith('/api/uploads/')) return url
-  if (url.startsWith('/uploads/')) return `/api${url}`
-  if (!url.startsWith('/')) return `/api/uploads/${url}`
-  return `/api${url}`
+  if (url.startsWith('/uploads/')) return `${API_BASE}${url}`
+  if (!url.startsWith('/')) return `${API_BASE}/uploads/${url}`
+  return `${API_BASE}${url}`
 }
 
 // 头像上传前校验

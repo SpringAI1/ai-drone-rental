@@ -192,7 +192,7 @@ const handleSubmit = async () => {
         password: form.password
       })
       ElMessage.success('注册成功')
-      router.push('/')
+      router.push('/login')
     } catch (error) {
       // 错误已在拦截器中处理
     } finally {

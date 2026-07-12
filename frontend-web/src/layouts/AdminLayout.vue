@@ -201,6 +201,8 @@ import { getAuditStats } from '@/api/admin'
 import { getAdminUnreadCount, adminMarkAllAsRead } from '@/api/notification'
 import AiChat from '@/components/common/AiChat.vue'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
@@ -297,7 +299,7 @@ const getAvatarUrl = computed(() => {
   const avatar = authStore.user?.avatar
   if (!avatar) return ''
   if (avatar.startsWith('http')) return avatar
-  return `/api${avatar}`
+  return `${API_BASE}${avatar}`
 })
 
 // 获取待审核数量

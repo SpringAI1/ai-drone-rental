@@ -126,6 +126,8 @@ import { useAuthStore } from '@/stores/auth'
 import { getUserInfo, updateUserInfo, updatePassword } from '@/api/user'
 import { upload } from '@/api/request'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
 const authStore = useAuthStore()
 
 const activeMenu = ref('info')
@@ -137,7 +139,7 @@ const avatarUrl = computed(() => {
   const avatar = authStore.user?.avatar
   if (!avatar) return ''
   if (avatar.startsWith('http')) return avatar
-  return `/api${avatar}`
+  return `${API_BASE}${avatar}`
 })
 
 const menuItems = [
