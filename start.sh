@@ -67,6 +67,7 @@ echo "[4/5] 启动后端 (端口 $PORT)..."
 cd "$BACKEND_DIR"
 JAVA_HOME=$JAVA_HOME nohup java -jar "$JAR_PATH" \
   --server.port=$PORT \
+  --file.upload-path=../uploads/ \
   --cors.allowed-origins="$CORS_ORIGINS" \
   > "$LOG_FILE" 2>&1 &
 BACKEND_PID=$!
