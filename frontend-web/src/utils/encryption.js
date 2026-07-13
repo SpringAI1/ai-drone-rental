@@ -20,6 +20,14 @@
 
 import CryptoJS from 'crypto-js'
 import { JSEncrypt } from 'jsencrypt'
+import axios from 'axios'
+
+// 独立的 axios 实例，仅用于获取公钥，避免与 request.js 形成循环依赖
+// baseURL 与主 axios 实例保持一致（生产环境为 VITE_API_BASE_URL，即 cpolar 隧道地址）
+const publicKeyClient = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  timeout: 10000
+})
 
 // ============== 缓存 ==============
 
@@ -42,8 +50,10 @@ export async function getPublicKey(force = false) {
 
   fetchingPromise = (async () => {
     try {
-      const res = await fetch('/api/public/rsa-key')
-      const json = await res.json()
+      // 通过独立 axios 实例请求，自动带上 VITE_API_BASE_URL
+      // 后端返回结构：{ code: 200, data: { publicKey, publicKeyPem } }
+      const response = await publicKeyClient.get('/public/rsa-key')
+      const json = response.data
       if (json.code === 200 && json.data) {
         // 优先使用 PEM 格式（jsencrypt 直接兼容），其次用 Base64 手动包裹
         cachedPublicKey = json.data.publicKeyPem
