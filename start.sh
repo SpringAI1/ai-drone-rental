@@ -12,8 +12,8 @@ BACKEND_DIR="$PROJECT_DIR/backend"
 JAR_PATH="$BACKEND_DIR/target/drone-rental-1.0.0.jar"
 PORT=8081
 LOG_FILE="/tmp/backend.log"
-TUNNEL_LOG="/tmp/cloudflared.log"
-CLOUDFLARED="/opt/homebrew/bin/cloudflared"
+TUNNEL_LOG="/tmp/cpolar.log"
+CPOLAR="$PROJECT_DIR/bin/cpolar"
 
 # CORS 白名单（Vercel 前端域名 + 本地开发）
 CORS_ORIGINS="http://localhost:5173,http://localhost:5174,http://localhost:3000,http://localhost:8080,https://frontend-web-umber-six.vercel.app,https://frontend-ki3qa6u4e-hiioe181516.vercel.app,https://frontend-uniapp.vercel.app"
@@ -54,8 +54,8 @@ if [ -n "$OLD_PID" ]; then
   sleep 2
 fi
 
-# 杀掉旧的 cloudflared 进程
-OLD_TUNNEL=$(pgrep -f "cloudflared tunnel --url" 2>/dev/null || true)
+# 杀掉旧的 cpolar 进程
+OLD_TUNNEL=$(pgrep -f "cpolar http" 2>/dev/null || true)
 if [ -n "$OLD_TUNNEL" ]; then
   echo "  停止旧 Tunnel 进程..."
   kill $OLD_TUNNEL 2>/dev/null || true
@@ -87,14 +87,14 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-# ---------- 5. 启动 Cloudflare Tunnel ----------
-echo "[5/5] 启动 Cloudflare Tunnel..."
-if [ ! -f "$CLOUDFLARED" ]; then
-  echo "  [错误] cloudflared 未安装"
+# ---------- 5. 启动 cpolar Tunnel ----------
+echo "[5/5] 启动 cpolar Tunnel..."
+if [ ! -f "$CPOLAR" ]; then
+  echo "  [错误] cpolar 未安装"
   exit 1
 fi
 
-nohup "$CLOUDFLARED" tunnel --url "http://localhost:$PORT" > "$TUNNEL_LOG" 2>&1 &
+nohup "$CPOLAR" http "$PORT" --log stdout --log-level INFO > "$TUNNEL_LOG" 2>&1 &
 TUNNEL_PID=$!
 echo "  Tunnel PID: $TUNNEL_PID"
 
@@ -102,7 +102,7 @@ echo "  Tunnel PID: $TUNNEL_PID"
 echo "  等待 Tunnel URL..."
 TUNNEL_URL=""
 for i in $(seq 1 20); do
-  TUNNEL_URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" 2>/dev/null | head -1)
+  TUNNEL_URL=$(strings "$TUNNEL_LOG" 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.r[0-9]+\.cpolar\.top' | head -1)
   if [ -n "$TUNNEL_URL" ]; then
     echo "  Tunnel 启动成功 ✓"
     break
