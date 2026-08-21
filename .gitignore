@@ -130,4 +130,7 @@ PROFILE_README.md
 # UniApp 前端编译产物
 frontend-uniapp/dist/
 
+# 本地二进制工具（cpolar 隧道客户端等，不提交）
+/bin/
+
 # 结束

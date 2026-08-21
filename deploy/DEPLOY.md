@@ -33,7 +33,7 @@ ssh root@<服务器IP>
 
 # 设置环境变量
 cat >> ~/.bashrc << 'EOF'
-export DASHSCOPE_API_KEY=sk-your-dashscope-api-key-here
+export DASHSCOPE_API_KEY=sk-your-key-here
 export JWT_SECRET=$(openssl rand -base64 32)
 export SQLITE_PATH=/opt/drone-rental/drone_rental.db
 EOF

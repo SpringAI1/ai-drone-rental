@@ -1,8 +1,9 @@
 #!/bin/bash
 # ============================================================
-# 一键启动后端 + Cloudflare Tunnel
+# 一键启动后端 + Cloudflare Named Tunnel (固定域名 api.hiioe.xyz)
 # 使用方法：bash start.sh
 # 前提：Mac 已开机，网络正常
+# 特点：URL 永久固定，重启后无需更新 Vercel 环境变量
 # ============================================================
 
 set -e
@@ -12,14 +13,16 @@ BACKEND_DIR="$PROJECT_DIR/backend"
 JAR_PATH="$BACKEND_DIR/target/drone-rental-1.0.0.jar"
 PORT=8081
 LOG_FILE="/tmp/backend.log"
-TUNNEL_LOG="/tmp/cpolar.log"
-CPOLAR="$PROJECT_DIR/bin/cpolar"
+TUNNEL_LOG="/tmp/cloudflared.log"
+TUNNEL_NAME="ai-rental"
+FIXED_URL="https://api.hiioe.xyz"
 
-# CORS 白名单（Vercel 前端域名 + 本地开发）
-CORS_ORIGINS="http://localhost:5173,http://localhost:5174,http://localhost:3000,http://localhost:8080,https://frontend-web-umber-six.vercel.app,https://frontend-ki3qa6u4e-hiioe181516.vercel.app,https://frontend-uniapp.vercel.app"
+# CORS 白名单（Vercel 前端域名 + 本地开发 + 固定域名）
+CORS_ORIGINS="http://localhost:5173,http://localhost:5174,http://localhost:3000,http://localhost:8080,https://frontend-web-umber-six.vercel.app,https://frontend-ki3qa6u4e-hiioe181516.vercel.app,https://frontend-uniapp.vercel.app,https://api.hiioe.xyz"
 
 echo "=========================================="
 echo "  AI-Rental 后端一键启动脚本"
+echo "  (Cloudflare Named Tunnel - 固定域名)"
 echo "=========================================="
 
 # ---------- 1. 检查 Java ----------
@@ -54,10 +57,10 @@ if [ -n "$OLD_PID" ]; then
   sleep 2
 fi
 
-# 杀掉旧的 cpolar 进程
-OLD_TUNNEL=$(pgrep -f "cpolar http" 2>/dev/null || true)
+# 杀掉旧的 cloudflared 进程（包括 Quick Tunnel 和 Named Tunnel）
+OLD_TUNNEL=$(pgrep -f "cloudflared" 2>/dev/null || true)
 if [ -n "$OLD_TUNNEL" ]; then
-  echo "  停止旧 Tunnel 进程..."
+  echo "  停止旧 cloudflared 进程..."
   kill $OLD_TUNNEL 2>/dev/null || true
   sleep 1
 fi
@@ -65,6 +68,15 @@ fi
 # ---------- 4. 启动后端 ----------
 echo "[4/5] 启动后端 (端口 $PORT)..."
 cd "$BACKEND_DIR"
+
+# 加载本地环境变量（DASHSCOPE_API_KEY / JWT_SECRET），.env 已在 .gitignore 中不会被提交
+if [ -f "$BACKEND_DIR/.env" ]; then
+  set -a
+  source "$BACKEND_DIR/.env"
+  set +a
+  echo "  已加载 backend/.env 环境变量"
+fi
+
 JAVA_HOME=$JAVA_HOME nohup java -jar "$JAR_PATH" \
   --server.port=$PORT \
   --file.upload-path=../uploads/ \
@@ -87,33 +99,37 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-# ---------- 5. 启动 cpolar Tunnel ----------
-echo "[5/5] 启动 cpolar Tunnel..."
-if [ ! -f "$CPOLAR" ]; then
-  echo "  [错误] cpolar 未安装"
+# ---------- 5. 启动 Cloudflare Named Tunnel ----------
+echo "[5/5] 启动 Cloudflare Named Tunnel ($TUNNEL_NAME)..."
+if ! command -v cloudflared >/dev/null 2>&1; then
+  echo "  [错误] cloudflared 未安装"
   exit 1
 fi
 
-nohup "$CPOLAR" http "$PORT" --log stdout --log-level INFO > "$TUNNEL_LOG" 2>&1 &
+# 检查隧道凭证文件
+if [ ! -f ~/.cloudflared/config.yml ]; then
+  echo "  [错误] 未找到 ~/.cloudflared/config.yml"
+  echo "  请先运行 cloudflared tunnel login 和 cloudflared tunnel create $TUNNEL_NAME"
+  exit 1
+fi
+
+nohup cloudflared tunnel run "$TUNNEL_NAME" > "$TUNNEL_LOG" 2>&1 &
 TUNNEL_PID=$!
 echo "  Tunnel PID: $TUNNEL_PID"
 
-# 等待 Tunnel URL 出现
-echo "  等待 Tunnel URL..."
-TUNNEL_URL=""
+# 等待隧道连接注册
+echo "  等待隧道连接..."
 for i in $(seq 1 20); do
-  TUNNEL_URL=$(strings "$TUNNEL_LOG" 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.r[0-9]+\.cpolar\.top' | head -1)
-  if [ -n "$TUNNEL_URL" ]; then
-    echo "  Tunnel 启动成功 ✓"
+  if grep -q "Registered tunnel connection" "$TUNNEL_LOG" 2>/dev/null; then
+    echo "  Tunnel 连接成功 ✓"
     break
+  fi
+  if [ $i -eq 20 ]; then
+    echo "  [警告] Tunnel 连接注册超时，请检查日志: $TUNNEL_LOG"
+    echo "  （不影响脚本继续运行，cloudflared 会自动重试）"
   fi
   sleep 2
 done
-
-if [ -z "$TUNNEL_URL" ]; then
-  echo "  [错误] Tunnel URL 获取超时，请检查日志: $TUNNEL_LOG"
-  exit 1
-fi
 
 # ---------- 输出结果 ----------
 echo ""
@@ -121,17 +137,15 @@ echo "=========================================="
 echo "  启动完成！"
 echo "=========================================="
 echo ""
-echo "  后端 API:   $TUNNEL_URL/api"
-echo "  后端日志:   $LOG_FILE"
-echo "  Tunnel日志: $TUNNEL_LOG"
+echo "  后端 API (固定地址): $FIXED_URL/api"
+echo "  后端日志:            $LOG_FILE"
+echo "  Tunnel日志:          $TUNNEL_LOG"
 echo ""
 echo "  前端地址:"
 echo "    Web:     https://frontend-web-umber-six.vercel.app"
 echo "    uniapp:  https://frontend-uniapp.vercel.app"
 echo ""
-echo "  ⚠️  Tunnel URL 变了的话，需要更新 Vercel 环境变量："
-echo "      VITE_API_BASE_URL = $TUNNEL_URL/api"
-echo "      然后在 Vercel 重新部署前端"
+echo "  ✅ URL 永久固定，重启后无需更新 Vercel 环境变量"
 echo ""
 echo "  按 Ctrl+C 停止后端和 Tunnel..."
 echo ""
