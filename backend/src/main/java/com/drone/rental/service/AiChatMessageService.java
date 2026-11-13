@@ -14,6 +14,12 @@ public interface AiChatMessageService extends IService<AiChatMessage> {
 
     void clearConversation(String conversationId);
 
+    /** 按会话 + 用户隔离读取（未登录 userId=null 仅读匿名消息，防止越权读取他人对话） */
+    List<AiChatMessage> getRecentMessages(String conversationId, Long userId, int limit);
+
+    /** 按会话 + 用户隔离清空（仅删除当前用户自己的消息） */
+    void clearConversation(String conversationId, Long userId);
+
     /** 分页查询会话摘要（按 conversation_id 聚合） */
     List<Map<String, Object>> getConversationSummaries(String keyword, Boolean withUserOnly, int offset, int limit);
 

@@ -7,7 +7,7 @@ import { encryptRequest, decryptResponse, ENCRYPTION_ENABLED } from './encryptio
 const API_BASE_URL =
   (typeof process !== 'undefined' && (process as any)?.env?.UNI_API_BASE_URL) ||
   (import.meta as any)?.env?.VITE_API_BASE_URL ||
-  'http://localhost:8080/api'
+  'http://localhost:8081/api'
 export const BASE_URL = API_BASE_URL
 
 interface RequestOptions {

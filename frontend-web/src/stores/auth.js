@@ -34,12 +34,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const userRegister = async (data) => {
-    const res = await register(data)
-    const { token: newToken, ...userInfo } = res.data
-    setToken(newToken, false)
-    setUser(userInfo)
-    await fetchUserInfo()
-    return res
+    // 注册接口只返回成功状态（不返回 token），注册成功后由页面跳转到登录页重新登录
+    return register(data)
   }
 
   const adminUserLogin = async (credentials) => {

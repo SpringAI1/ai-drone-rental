@@ -37,6 +37,11 @@ public interface OrderService extends IService<RentalOrder> {
     void simulatePay(Long orderId, String deliveryAddress, Integer paymentMethod);
 
     /**
+     * 模拟支付（显式指定操作者，用于 AI 工具在异步线程中透传 userId，避免 ThreadLocal 失效）
+     */
+    void simulatePayAs(Long orderId, String deliveryAddress, Integer paymentMethod, Long operatorUserId);
+
+    /**
      * 取消订单
      */
     void cancelOrder(Long orderId, String reason);

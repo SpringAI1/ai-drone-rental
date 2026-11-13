@@ -42,10 +42,10 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
+      // 后端 context-path 是 /api、端口是 8081，直接透传即可，不要再 rewrite 掉 /api
       '/api': {
-        target: 'http://localhost:8080/api',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        target: 'http://localhost:8081',
+        changeOrigin: true
       }
     }
   },

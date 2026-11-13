@@ -68,7 +68,8 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
     @Override
     @Transactional(rollbackFor = Exception.class)
     public OrderVO createOrder(OrderCreateDTO dto) {
-        Long userId = UserContext.getCurrentUserId();
+        // AI 工具在异步线程执行时 ThreadLocal 失效，优先用 DTO 透传的 userId（HTTP 路径 userId 为 null 时回退 ThreadLocal）
+        Long userId = dto.getUserId() != null ? dto.getUserId() : UserContext.getCurrentUserId();
 
         // 1. 校验用户状态 / 资质 / 机型可租 / 空域备案
         userService.checkUserOperable(userId);
@@ -184,11 +185,17 @@ public class OrderServiceImpl extends ServiceImpl<RentalOrderMapper, RentalOrder
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void simulatePay(Long orderId, String deliveryAddress, Integer paymentMethod) {
+        simulatePayAs(orderId, deliveryAddress, paymentMethod, UserContext.getCurrentUserId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void simulatePayAs(Long orderId, String deliveryAddress, Integer paymentMethod, Long operatorUserId) {
         RentalOrder order = this.getById(orderId);
         if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_EXIST);
         }
-        if (!order.getUserId().equals(UserContext.getCurrentUserId())) {
+        if (!order.getUserId().equals(operatorUserId)) {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
         if (order.getOrderStatus() != Constants.ORDER_STATUS_UNPAID) {

@@ -43,7 +43,7 @@
             <el-input
               v-model="form.password"
               type="password"
-              placeholder="请输入密码（至少6位）"
+              placeholder="请输入密码（6-20位，含字母和数字）"
               :prefix-icon="Lock"
               show-password
             />
@@ -148,6 +148,21 @@ const validateConfirmPassword = (rule, value, callback) => {
   }
 }
 
+const validatePasswordStrength = (rule, value, callback) => {
+  if (!value) {
+    callback()
+    return
+  }
+  // 与后端 UserServiceImpl.validatePasswordStrength 保持一致：必须同时包含字母和数字
+  const hasLetter = /[a-zA-Z]/.test(value)
+  const hasDigit = /[0-9]/.test(value)
+  if (!hasLetter || !hasDigit) {
+    callback(new Error('密码必须同时包含字母和数字'))
+  } else {
+    callback()
+  }
+}
+
 const validateAgreement = (rule, value, callback) => {
   if (!value) {
     callback(new Error('请阅读并同意服务协议'))
@@ -163,11 +178,12 @@ const rules = {
   ],
   username: [
     { required: true, message: '请输入用户名', trigger: 'submit' },
-    { min: 3, max: 20, message: '用户名长度为3-20个字符', trigger: 'submit' }
+    { min: 4, max: 20, message: '用户名长度为4-20个字符', trigger: 'submit' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'submit' },
-    { min: 6, message: '密码至少6位', trigger: 'submit' }
+    { min: 6, max: 20, message: '密码长度为6-20个字符', trigger: 'submit' },
+    { validator: validatePasswordStrength, trigger: 'submit' }
   ],
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'submit' },

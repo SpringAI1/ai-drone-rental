@@ -98,6 +98,20 @@ public class DroneChatService {
         return ctx;
     }
 
+    /** 组装系统提示：附带 RAG 检索到的知识库参考（检索失败或为空时仅用基础提示） */
+    private String buildSystemPrompt(String userMessage) {
+        try {
+            List<Document> ragDocs = ragService.search(userMessage, 3);
+            if (ragDocs != null && !ragDocs.isEmpty()) {
+                log.info("[AI] RAG 命中 {} 块，注入上下文", ragDocs.size());
+                return SYSTEM_PROMPT + "\n\n" + ragService.formatContext(ragDocs);
+            }
+        } catch (Exception e) {
+            log.warn("[AI] RAG 检索失败，忽略: {}", e.getMessage());
+        }
+        return SYSTEM_PROMPT;
+    }
+
     /**
      * 非流式对话 - 返回完整回答
      */
@@ -105,10 +119,10 @@ public class DroneChatService {
         String conversationId = resolveConversationId(conversationIdIn);
         Long userId = currentUserId();
         ChatMemory mem = memoryFor(conversationId);
-        ensureHistory(conversationId, mem);
+        ensureHistory(conversationId, userId, mem);
 
         String answer = chatClient.prompt()
-                .system(SYSTEM_PROMPT)
+                .system(buildSystemPrompt(userMessage))
                 .user(userMessage)
                 .toolContext(buildToolContext())
                 .advisors(MessageChatMemoryAdvisor.builder(mem).build())
@@ -126,15 +140,11 @@ public class DroneChatService {
         String conversationId = resolveConversationId(conversationIdIn);
         Long userId = currentUserId();
         ChatMemory mem = memoryFor(conversationId);
-        ensureHistory(conversationId, mem);
-
-        // 预检 RAG（仅打日志 + 注入 system 提示，不阻塞流式）
-        List<Document> ragDocs = ragService.search(userMessage, 3);
-        log.info("[AI] stream 会话 {} 命中 RAG {} 块", conversationId, ragDocs.size());
+        ensureHistory(conversationId, userId, mem);
 
         StringBuilder full = new StringBuilder();
         return chatClient.prompt()
-                .system(SYSTEM_PROMPT)
+                .system(buildSystemPrompt(userMessage))
                 .user(userMessage)
                 .toolContext(buildToolContext())
                 .advisors(MessageChatMemoryAdvisor.builder(mem).build())
@@ -151,9 +161,11 @@ public class DroneChatService {
     /**
      * 把 DB 历史加载进 ChatMemory（保证重启后多轮上下文连续）
      */
-    private void ensureHistory(String conversationId, ChatMemory mem) {
+    private void ensureHistory(String conversationId, Long userId, ChatMemory mem) {
         try {
-            List<AiChatMessage> history = aiChatMessageService.getRecentMessages(conversationId, 20);
+            // 先清空再加载：避免每次请求把历史反复追加到同一 ChatMemory，导致重复/上下文膨胀
+            mem.clear(conversationId);
+            List<AiChatMessage> history = aiChatMessageService.getRecentMessages(conversationId, userId, 20);
             for (AiChatMessage msg : history) {
                 String content = msg.getContent();
                 if (content == null || content.isBlank()) continue;

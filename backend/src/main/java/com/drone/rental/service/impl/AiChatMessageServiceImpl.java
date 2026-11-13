@@ -9,6 +9,7 @@ import com.drone.rental.mapper.AiChatMessageMapper;
 import com.drone.rental.service.AiChatMessageService;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -41,17 +42,63 @@ public class AiChatMessageServiceImpl extends ServiceImpl<AiChatMessageMapper, A
         // 使用 MyBatis Plus Page 替代 .last("LIMIT ...")，避免 SQL 注入
         Page<AiChatMessage> page = new Page<>(1, limit);
         LambdaQueryWrapper<AiChatMessage> wrapper = new LambdaQueryWrapper<>();
+        // 先倒序分页取“最新 limit 条”，再转回时间正序（否则拿到的是最旧的 limit 条）
         wrapper.eq(AiChatMessage::getConversationId, conversationId)
-                .orderByAsc(AiChatMessage::getCreatedTime);
+                .orderByDesc(AiChatMessage::getCreatedTime);
 
         IPage<AiChatMessage> result = this.page(page, wrapper);
-        return result.getRecords() != null ? result.getRecords() : Collections.emptyList();
+        return toAscending(result.getRecords());
+    }
+
+    /** 倒序分页结果 → 时间正序（空安全） */
+    private List<AiChatMessage> toAscending(List<AiChatMessage> records) {
+        if (records == null || records.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<AiChatMessage> list = new ArrayList<>(records);
+        Collections.reverse(list);
+        return list;
+    }
+
+    @Override
+    public List<AiChatMessage> getRecentMessages(String conversationId, Long userId, int limit) {
+        if (limit <= 0) {
+            limit = DEFAULT_MESSAGE_LIMIT;
+        }
+        if (limit > MAX_MESSAGE_LIMIT) {
+            limit = MAX_MESSAGE_LIMIT;
+        }
+        Page<AiChatMessage> page = new Page<>(1, limit);
+        LambdaQueryWrapper<AiChatMessage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(AiChatMessage::getConversationId, conversationId);
+        if (userId == null) {
+            wrapper.isNull(AiChatMessage::getUserId);
+        } else {
+            wrapper.eq(AiChatMessage::getUserId, userId);
+        }
+        // 先倒序分页取“最新 limit 条”，再转回时间正序，避免历史倒置 + 只拿到最旧消息
+        wrapper.orderByDesc(AiChatMessage::getCreatedTime);
+
+        IPage<AiChatMessage> result = this.page(page, wrapper);
+        return toAscending(result.getRecords());
     }
 
     @Override
     public void clearConversation(String conversationId) {
         LambdaQueryWrapper<AiChatMessage> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AiChatMessage::getConversationId, conversationId);
+        this.remove(wrapper);
+    }
+
+    @Override
+    public void clearConversation(String conversationId, Long userId) {
+        LambdaQueryWrapper<AiChatMessage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(AiChatMessage::getConversationId, conversationId);
+        if (userId == null) {
+            wrapper.isNull(AiChatMessage::getUserId);
+        } else {
+            wrapper.eq(AiChatMessage::getUserId, userId);
+        }
         this.remove(wrapper);
     }
 

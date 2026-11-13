@@ -132,8 +132,20 @@ const handleRegister = async () => {
     uni.showToast({ title: '请输入用户名', icon: 'none' })
     return
   }
+  if (username.value.trim().length < 4) {
+    uni.showToast({ title: '用户名至少4个字符', icon: 'none' })
+    return
+  }
   if (!password.value.trim()) {
     uni.showToast({ title: '请输入密码', icon: 'none' })
+    return
+  }
+  if (password.value.length < 6 || password.value.length > 20) {
+    uni.showToast({ title: '密码长度为6-20个字符', icon: 'none' })
+    return
+  }
+  if (!/[a-zA-Z]/.test(password.value) || !/[0-9]/.test(password.value)) {
+    uni.showToast({ title: '密码必须同时包含字母和数字', icon: 'none' })
     return
   }
   if (password.value !== confirmPassword.value) {
@@ -156,17 +168,19 @@ const handleRegister = async () => {
 
     uni.showToast({ title: '注册成功', icon: 'success' })
     setTimeout(() => {
-      uni.navigateBack()
+      uni.redirectTo({ url: '/pages/user/login' })
     }, 1000)
   } catch (err) {
     console.error('Register failed:', err)
+    const msg = (err && err.message) ? err.message : '注册失败，请重试'
+    uni.showToast({ title: msg, icon: 'none' })
   } finally {
     loading.value = false
   }
 }
 
 const goToLogin = () => {
-  uni.navigateBack()
+  uni.redirectTo({ url: '/pages/user/login' })
 }
 </script>
 

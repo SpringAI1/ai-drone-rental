@@ -48,22 +48,40 @@ else
   echo "[2/5] JAR 包已存在 ✓"
 fi
 
-# ---------- 3. 检查端口占用，杀掉旧进程 ----------
-echo "[3/5] 检查端口 $PORT..."
-OLD_PID=$(lsof -ti :$PORT 2>/dev/null || true)
-if [ -n "$OLD_PID" ]; then
-  echo "  端口 $PORT 被占用 (PID $OLD_PID)，正在停止..."
-  kill -9 $OLD_PID 2>/dev/null || true
-  sleep 2
-fi
+# ---------- 3. 清理旧进程（端口 + cloudflared），确保干净启动 ----------
+echo "[3/5] 清理旧进程..."
 
-# 杀掉旧的 cloudflared 进程（包括 Quick Tunnel 和 Named Tunnel）
+# 3.1 先停 cloudflared（它持有到后端的长连接，不先杀会导致后端端口无法释放）
 OLD_TUNNEL=$(pgrep -f "cloudflared" 2>/dev/null || true)
 if [ -n "$OLD_TUNNEL" ]; then
-  echo "  停止旧 cloudflared 进程..."
-  kill $OLD_TUNNEL 2>/dev/null || true
+  echo "  停止旧 cloudflared 进程 (PID $OLD_TUNNEL)..."
+  kill -9 $OLD_TUNNEL 2>/dev/null || true
   sleep 1
 fi
+
+# 3.2 杀占用 PORT 的进程（可能是上次的后端），最多重试 5 次
+for attempt in 1 2 3 4 5; do
+  PORT_PIDS=$(lsof -ti :$PORT 2>/dev/null || true)
+  if [ -z "$PORT_PIDS" ]; then
+    break
+  fi
+  echo "  端口 $PORT 被占用 (PID $PORT_PIDS)，第 $attempt 次清理..."
+  kill -9 $PORT_PIDS 2>/dev/null || true
+  sleep 2
+done
+
+# 3.3 兜底：用 pkill 按 jar 名匹配，确保残留 java 进程被清掉
+pkill -9 -f "drone-rental" 2>/dev/null || true
+sleep 1
+
+# 3.4 最终验证端口是否真的释放
+if lsof -ti :$PORT 2>/dev/null | grep -q .; then
+  echo "  [错误] 端口 $PORT 仍被占用，无法启动。请手动执行："
+  echo "         lsof -i :$PORT    # 查看占用进程"
+  echo "         kill -9 <PID>     # 手动杀掉"
+  exit 1
+fi
+echo "  端口 $PORT 已释放 ✓"
 
 # ---------- 4. 启动后端 ----------
 echo "[4/5] 启动后端 (端口 $PORT)..."
@@ -88,7 +106,7 @@ echo "  后端 PID: $BACKEND_PID"
 # 等待后端启动
 echo "  等待后端启动..."
 for i in $(seq 1 30); do
-  if curl -s -o /dev/null -w '' "http://localhost:$PORT/api/drone/list?page=1&size=1" 2>/dev/null; then
+  if curl -s -o /dev/null -w '' --noproxy localhost,127.0.0.1 --max-time 3 "http://localhost:$PORT/api/drone/list?page=1&size=1" 2>/dev/null; then
     echo "  后端启动成功 ✓"
     break
   fi

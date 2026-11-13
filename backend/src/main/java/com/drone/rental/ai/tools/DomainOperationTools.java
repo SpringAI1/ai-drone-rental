@@ -124,6 +124,8 @@ public class DomainOperationTools {
         dto.setEndDate(end);
         dto.setDeliveryAddress(deliveryAddress);
         dto.setRemark(remark != null ? remark : "AI 智能下单");
+        // 把 ToolContext 解析出的 userId 透传给 service，避免异步线程 ThreadLocal 失效
+        dto.setUserId(userId);
         try {
             OrderVO vo = orderService.createOrder(dto);
             return String.format("""
@@ -158,17 +160,15 @@ public class DomainOperationTools {
         if (order == null) return "未找到订单 " + orderNo;
         if (order.getOrderStatus() != 0) return "订单 " + orderNo + " 当前状态不是「待支付」，无法支付";
 
-        // 安全校验：只能支付自己的订单（除非管理员）
+        // 安全校验：只能支付自己的订单（AI 助手以登录用户身份操作）
         Long userId = currentUserId(toolContext);
-        Integer role = null;
-        try { role = UserContext.getCurrentRole(); } catch (Exception ignored) {}
-        if (userId != null && role != null && role == 0 && !userId.equals(order.getUserId())) {
+        if (userId != null && !userId.equals(order.getUserId())) {
             return "支付失败：订单 " + orderNo + " 不属于您，无权操作";
         }
 
         try {
             int method = (paymentMethod == null) ? 3 : paymentMethod;
-            orderService.simulatePay(order.getId(), order.getDeliveryAddress(), method);
+            orderService.simulatePayAs(order.getId(), order.getDeliveryAddress(), method, userId);
             return "支付成功！订单 " + orderNo + " 已支付，等待管理员发货。";
         } catch (Exception e) {
             return "支付失败：" + e.getMessage();

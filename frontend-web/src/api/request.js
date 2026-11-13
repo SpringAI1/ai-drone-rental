@@ -133,24 +133,37 @@ service.interceptors.response.use(
     }
 
     if (error.response) {
-      const { status, data } = error.response
+      const { status } = error.response
+      let { data } = error.response
+
+      // 后端对加密请求的 4xx/5xx 响应同样会加密，这里先解密再取 message，
+      // 否则参数校验错误(400)会被误报成“网络错误”
+      if (data && data.encrypted === true && data.data) {
+        try {
+          data = decryptResponse(data)
+        } catch (err) {
+          data = null
+        }
+      }
 
       switch (status) {
         case 401:
           handleUnauthorized()
           break
         case 403:
-          ElMessage.error('无权限访问')
+          ElMessage.error(data?.message || '无权限访问')
           break
         case 404:
-          ElMessage.error('请求的资源不存在')
+          ElMessage.error(data?.message || '请求的资源不存在')
           break
         case 500:
-          ElMessage.error('服务器内部错误')
+          ElMessage.error(data?.message || '服务器内部错误')
           break
         default:
           if (!data?.code || data.code !== 401) {
             ElMessage.error(data?.message || '网络错误，请稍后重试')
+          } else {
+            handleUnauthorized()
           }
       }
     } else if (error.code === 'ECONNABORTED') {

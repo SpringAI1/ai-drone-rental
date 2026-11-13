@@ -8,11 +8,16 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.Properties;
 
 /**
  * RSA+AES 混合加密服务 (信封加密)
@@ -38,16 +43,58 @@ public class EncryptionService {
     private PrivateKey rsaPrivateKey;
     private String rsaPublicKeyBase64;
 
+    /** RSA 密钥对持久化文件路径（重启后密钥不变，前端缓存的公钥不会失效） */
+    private static final String KEY_PAIR_FILE = System.getProperty("user.dir") + "/.rsa-keypair";
+
     // 线程本地变量：存放当前请求-响应周期的 AES 密钥
     private static final ThreadLocal<String> currentAesKey = new ThreadLocal<>();
 
     public EncryptionService() {
         try {
-            generateRsaKeyPair();
-            log.info("加密服务初始化完成，RSA-2048 密钥对已生成");
+            loadOrGenerateKeyPair();
         } catch (Exception e) {
             log.error("加密服务初始化失败", e);
-            throw new RuntimeException("RSA 密钥生成失败", e);
+            throw new RuntimeException("RSA 密钥初始化失败", e);
+        }
+    }
+
+    /**
+     * 加载或生成 RSA 密钥对（持久化到文件，重启不变）
+     */
+    private synchronized void loadOrGenerateKeyPair() throws Exception {
+        Path keyFile = Paths.get(KEY_PAIR_FILE);
+        if (Files.exists(keyFile)) {
+            // 从文件加载密钥对
+            Properties props = new Properties();
+            try (var reader = Files.newBufferedReader(keyFile, StandardCharsets.UTF_8)) {
+                props.load(reader);
+            }
+            String pubB64 = props.getProperty("publicKey");
+            String priB64 = props.getProperty("privateKey");
+            if (pubB64 != null && priB64 != null) {
+                this.rsaPublicKeyBase64 = pubB64;
+                this.rsaPrivateKey = parseRsaPrivateKey(priB64);
+                log.info("加密服务初始化完成，RSA 密钥对已从文件加载: {}", KEY_PAIR_FILE);
+                return;
+            }
+            log.warn("密钥文件格式异常，重新生成密钥对");
+        }
+        // 生成新密钥对并持久化
+        generateRsaKeyPair();
+        saveKeyPairToFile();
+        log.info("加密服务初始化完成，RSA-2048 密钥对已生成并持久化: {}", KEY_PAIR_FILE);
+    }
+
+    /**
+     * 把 RSA 密钥对写入文件（Base64 编码）
+     */
+    private void saveKeyPairToFile() throws IOException {
+        Properties props = new Properties();
+        props.setProperty("publicKey", rsaPublicKeyBase64);
+        props.setProperty("privateKey", Base64.getEncoder().encodeToString(rsaPrivateKey.getEncoded()));
+        Path keyFile = Paths.get(KEY_PAIR_FILE);
+        try (var writer = Files.newBufferedWriter(keyFile, StandardCharsets.UTF_8)) {
+            props.store(writer, "RSA-2048 key pair for AI-Rental encryption (do not commit to git)");
         }
     }
 

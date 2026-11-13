@@ -161,7 +161,7 @@ public class DroneQueryTools {
     @Tool(description = "查询某用户的所有订单记录。管理员可指定 userId；普通用户只能查自己的")
     public String queryUserOrders(
             @ToolParam(description = "用户ID（管理员可指定；不填则查当前登录用户）", required = false) Long userId,
-            @ToolParam(description = "订单状态：0-待支付 1-已支付 2-租赁中 3-已归还 4-已取消 5-已退款，可选", required = false) Integer orderStatus,
+            @ToolParam(description = "订单状态：0-待支付 1-已支付(待发货) 2-已发货(待收货) 3-租赁中 4-已归还 5-已取消 6-已退款，可选", required = false) Integer orderStatus,
             @ToolParam(description = "返回条数，默认10", required = false) Integer limit,
             ToolContext toolContext
     ) {
@@ -246,11 +246,12 @@ public class DroneQueryTools {
         if (s == null) return "未知";
         return switch (s) {
             case 0 -> "待支付";
-            case 1 -> "已支付";
-            case 2 -> "租赁中";
-            case 3 -> "已归还";
-            case 4 -> "已取消";
-            case 5 -> "已退款";
+            case 1 -> "已支付（待发货）";
+            case 2 -> "已发货（待收货）";
+            case 3 -> "租赁中";
+            case 4 -> "已归还";
+            case 5 -> "已取消";
+            case 6 -> "已退款";
             default -> "未知";
         };
     }

@@ -6,6 +6,7 @@ import com.drone.rental.ai.tools.DomainOperationTools;
 import com.drone.rental.ai.tools.DroneQueryTools;
 import com.drone.rental.common.Result;
 import com.drone.rental.dto.AiStatusDTO;
+import com.drone.rental.security.UserContext;
 import com.drone.rental.entity.AiChatMessage;
 import com.drone.rental.service.AiChatMessageService;
 import com.drone.rental.service.AiConfigService;
@@ -58,6 +59,11 @@ public class AiChatController {
     private final DomainOperationTools domainOperationTools;
     private final AiChatMessageService aiChatMessageService;
     private final AiConfigService aiConfigService;
+
+    /** 当前登录用户 ID（未登录返回 null，用于对话隔离） */
+    private Long currentUserId() {
+        try { return UserContext.getCurrentUserId(); } catch (Exception e) { return null; }
+    }
 
     @PostMapping("/chat")
     @Operation(summary = "AI 智能对话 - RAG + Tool + Memory 完整链路")
@@ -127,7 +133,7 @@ public class AiChatController {
     @GetMapping("/history/{conversationId}")
     @Operation(summary = "获取对话历史")
     public Result<List<Map<String, Object>>> getHistory(@PathVariable String conversationId) {
-        List<AiChatMessage> messages = aiChatMessageService.getRecentMessages(conversationId, 50);
+        List<AiChatMessage> messages = aiChatMessageService.getRecentMessages(conversationId, currentUserId(), 50);
         List<Map<String, Object>> result = messages.stream()
                 .map(m -> {
                     Map<String, Object> map = new HashMap<>();
@@ -143,7 +149,7 @@ public class AiChatController {
     @DeleteMapping("/conversation/{conversationId}")
     @Operation(summary = "清空指定对话")
     public Result<Void> clearConversation(@PathVariable String conversationId) {
-        aiChatMessageService.clearConversation(conversationId);
+        aiChatMessageService.clearConversation(conversationId, currentUserId());
         return Result.success();
     }
 

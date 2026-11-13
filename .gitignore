@@ -85,6 +85,8 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+# RSA 密钥对文件（含私钥，严禁提交）
+.rsa-keypair
 # 保留 .env.example 作为模板
 !.env.example
 
